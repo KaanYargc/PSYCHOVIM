@@ -66,6 +66,7 @@ Open Neovim and run:
 |---------|----------|
 | `Space` | Leader key |
 | `jk` / `kj` | Exit insert mode |
+| `Ctrl+c` | Quick exit from insert mode |
 | `<leader>w` | Save (hide the body) |
 | `<leader>q` | Quit (leave no trace) |
 | `<leader>Q` | Close all (burn everything) |
