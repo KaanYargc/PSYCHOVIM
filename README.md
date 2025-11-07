@@ -2,104 +2,106 @@
 
 > *"Look at that subtle off-white coloring. The tasteful thickness of it. Oh my God, it even has a watermark."*
 
-American Psycho temalı, psikopat detaylarla dolu bir Neovim konfigürasyonu. Patrick Bateman'ın obsesif mükemmeliyetçiliği ve karanlık estetiğini kodlama ortamınıza taşıyor.
+An American Psycho themed Neovim configuration filled with psychopathic details. Bringing Patrick Bateman's obsessive perfectionism and dark aesthetic to your coding environment.
 
-## 🩸 Özellikler
+## 🩸 Features
 
-### Estetik Mükemmellik
-- **Karanlık Tema**: Catppuccin Mocha (kan kırmızısı vurgularla)
-- **Obsesif Detaylar**: Her piksel yerli yerinde
-- **Psikopat İkonlar**: 🔪 💀 🩸 ⚠️ 💥
-- **Mükemmel Simetri**: Auto-pairs ve indent guides
+### Aesthetic Perfection
+- **Dark Theme**: Catppuccin Mocha (with blood red highlights)
+- **Obsessive Details**: Every pixel in its place
+- **Psychopath Icons**: 🔪 💀 🩸 ⚠️ 💥
+- **Perfect Symmetry**: Auto-pairs and indent guides
 
-### Stalking Araçları
-- **Telescope**: Kurbanları bul ve takip et
-- **NvimTree**: Bölgeyi haritalandır
-- **Gitsigns**: Kanıtları takip et
-- **Todo Comments**: KILL, VICTIM, HIDE etiketleri
+### Stalking Tools
+- **Telescope**: Find and track victims
+- **NvimTree**: Map the territory
+- **Gitsigns**: Track the evidence
+- **Todo Comments**: KILL, VICTIM, HIDE tags
 
-### Psikolojik Özellikler
-- **Random Mesajlar**: Her açılışta farklı bir Patrick Bateman alıntısı
-- **Smooth Scrolling**: Zarif ve hesaplı hareketler
-- **Undo Persistence**: Hiçbir şeyi unutma
-- **Auto-cleanup**: Obsesif temizlik (trailing whitespace)
+### Psychological Features
+- **Random Messages**: A different Patrick Bateman quote on each startup
+- **Smooth Scrolling**: Elegant and calculated movements
+- **Undo Persistence**: Never forget anything
+- **Auto-cleanup**: Obsessive cleaning (trailing whitespace)
 
-## 📦 Kurulum
+## 📦 Installation
 
-### 1. Packer'ı Yükle
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/KaanYargc/PSYCHOVIM.git ~/.config/nvim
+```
+
+### 2. Remove the .git folder (so you can add it to your own repo later)
+
+```bash
+rm -rf ~/.config/nvim/.git
+```
+
+### 3. Install Packer
 
 ```bash
 git clone --depth 1 https://github.com/wbthomason/packer.nvim\
  ~/.local/share/nvim/site/pack/packer/start/packer.nvim
 ```
 
-### 2. Konfigürasyonu Kopyala
+### 4. Install Plugins
 
-```bash
-# Mevcut config'i yedekle (eğer varsa)
-mv ~/.config/nvim ~/.config/nvim.backup
-
-# PychoVim'i kopyala
-cp -r . ~/.config/nvim
-```
-
-### 3. Pluginleri Yükle
-
-Neovim'i aç ve şunu çalıştır:
+Open Neovim and run:
 
 ```vim
 :PackerSync
 ```
 
-### 4. Treesitter'ı Güncelle
+### 5. Update Treesitter
 
 ```vim
 :TSUpdate
 ```
 
-## 🎯 Kısayollar
+## 🎯 Keybindings
 
-### Temel İşlemler
-| Kısayol | Açıklama |
+### Basic Operations
+| Keybinding | Description |
 |---------|----------|
-| `Space` | Leader tuşu |
-| `jk` / `kj` | Insert mode'dan çık |
-| `<leader>w` | Kaydet (hide the body) |
-| `<leader>q` | Çık (leave no trace) |
-| `<leader>Q` | Hepsini kapat (burn everything) |
+| `Space` | Leader key |
+| `jk` / `kj` | Exit insert mode |
+| `<leader>w` | Save (hide the body) |
+| `<leader>q` | Quit (leave no trace) |
+| `<leader>Q` | Close all (burn everything) |
 
-### Buffer Yönetimi (Victim Selection)
-| Kısayol | Açıklama |
+### Buffer Management (Victim Selection)
+| Keybinding | Description |
 |---------|----------|
-| `<leader>bd` | Buffer'ı sil (eliminate) |
-| `Tab` | Sonraki buffer (next victim) |
-| `Shift+Tab` | Önceki buffer (previous victim) |
+| `<leader>bd` | Delete buffer (eliminate) |
+| `Tab` | Next buffer (next victim) |
+| `Shift+Tab` | Previous buffer (previous victim) |
 
-### Pencere Yönetimi (Kill Room)
-| Kısayol | Açıklama |
+### Window Management (Kill Room)
+| Keybinding | Description |
 |---------|----------|
-| `Ctrl+h/j/k/l` | Pencereler arası gezin |
-| `<leader>sv` | Dikey böl (vertical dissection) |
-| `<leader>sh` | Yatay böl (horizontal dissection) |
-| `<leader>sx` | Pencereyi kapat |
+| `Ctrl+h/j/k/l` | Navigate between windows |
+| `<leader>sv` | Split vertically (vertical dissection) |
+| `<leader>sh` | Split horizontally (horizontal dissection) |
+| `<leader>sx` | Close window |
 
 ### Telescope (Stalking Tools)
-| Kısayol | Açıklama |
+| Keybinding | Description |
 |---------|----------|
-| `<leader>ff` | Dosya bul (hunt) |
-| `<leader>fg` | Metin ara (search for clues) |
-| `<leader>fb` | Buffer listesi (victim list) |
-| `<leader>fr` | Son dosyalar (past crimes) |
+| `<leader>ff` | Find files (hunt) |
+| `<leader>fg` | Search text (search for clues) |
+| `<leader>fb` | Buffer list (victim list) |
+| `<leader>fr` | Recent files (past crimes) |
 
-### Dosya Ağacı
-| Kısayol | Açıklama |
+### File Tree
+| Keybinding | Description |
 |---------|----------|
-| `<leader>e` | Dosya ağacını aç/kapat |
-| `<leader>o` | Dosya ağacına odaklan |
+| `<leader>e` | Toggle file tree |
+| `<leader>o` | Focus on file tree |
 
-## 🎨 Tema Değiştirme
+## 🎨 Changing Theme
 
-Varsayılan tema Catppuccin Mocha, ama başka seçenekler de var:
+Default theme is Catppuccin Mocha, but there are other options:
 
 ```vim
 :colorscheme tokyonight
@@ -107,36 +109,36 @@ Varsayılan tema Catppuccin Mocha, ama başka seçenekler de var:
 :colorscheme rose-pine
 ```
 
-## 🔧 Özelleştirme
+## 🔧 Customization
 
-### Kendi Mesajlarını Ekle
+### Add Your Own Messages
 
-`init.lua` dosyasındaki `messages` tablosunu düzenle:
+Edit the `messages` table in `init.lua`:
 
 ```lua
 local messages = {
-    "Kendi psikopat mesajın...",
-    "Başka bir karanlık alıntı...",
+    "Your own psychopathic message...",
+    "Another dark quote...",
 }
 ```
 
-### Renkleri Değiştir
+### Change Colors
 
-`lua/plugins.lua` içinde Catppuccin ayarlarını düzenle:
+Edit Catppuccin settings in `lua/plugins.lua`:
 
 ```lua
 color_overrides = {
     mocha = {
-        base = "#0d0d0d",      -- Arka plan
-        red = "#8b0000",       -- Kan kırmızısı
-        -- Diğer renkler...
+        base = "#0d0d0d",      -- Background
+        red = "#8b0000",       -- Blood red
+        -- Other colors...
     },
 },
 ```
 
-## 📚 Plugin Listesi
+## 📚 Plugin List
 
-- **catppuccin/nvim** - Ana tema (karanlık ve sofistike)
+- **catppuccin/nvim** - Main theme (dark and sophisticated)
 - **nvim-lualine/lualine.nvim** - Status line (business card quality)
 - **akinsho/bufferline.nvim** - Buffer tabs (victim tabs)
 - **goolord/alpha-nvim** - Dashboard (welcome to hell)
@@ -154,9 +156,9 @@ color_overrides = {
 - **norcalli/nvim-colorizer.lua** - Color highlighter (blood detection)
 - **lukas-reineke/indent-blankline.nvim** - Indent guides (OCD lines)
 
-## 🎬 Ekran Görüntüleri
+## 🎬 Screenshots
 
-Dashboard'da seni şu karşılıyor:
+The dashboard greets you with:
 
 ```
   ██████╗ ██╗   ██╗ ██████╗██╗  ██╗ ██████╗ ██╗   ██╗██╗███╗   ███╗
@@ -171,59 +173,59 @@ Dashboard'da seni şu karşılıyor:
 Let's see Paul Allen's config...
 ```
 
-## 💀 Todo Etiketleri
+## 💀 Todo Tags
 
-Kodunda özel etiketler kullanabilirsin:
+You can use special tags in your code:
 
 ```lua
--- KILL: Bu fonksiyonu yok et
--- VICTIM: Bu değişken hedef
--- HIDE: Bu kodu gizle
+-- KILL: Destroy this function
+-- VICTIM: This variable is a target
+-- HIDE: Hide this code
 -- TODO: Normal todo
--- HACK: Kirli iş
--- WARN: Dikkat
--- PERF: Performans
--- NOTE: Not
+-- HACK: Dirty work
+-- WARN: Warning
+-- PERF: Performance
+-- NOTE: Note
 ```
 
-## 🩺 Sorun Giderme
+## 🩺 Troubleshooting
 
-### Pluginler yüklenmiyor
+### Plugins not loading
 ```vim
 :PackerSync
 :PackerCompile
 ```
 
-### Treesitter hataları
+### Treesitter errors
 ```vim
 :TSUpdate
 :TSInstall lua vim python javascript
 ```
 
-### Tema yüklenmiyor
+### Theme not loading
 ```vim
 :PackerSync
 :colorscheme catppuccin
 ```
 
-## 🎭 Alıntılar
+## 🎭 Quotes
 
-Her Neovim açılışında rastgele bir Patrick Bateman alıntısı görürsün:
+You'll see a random Patrick Bateman quote on each Neovim startup:
 
 - "Let's see Paul Allen's config..."
 - "I have to return some videotapes"
 - "Try getting a reservation at Dorsia now!"
 - "I'm into murders and executions mostly"
 - "Do you like Huey Lewis and the News?"
-- Ve daha fazlası...
+- And more...
 
-## 📝 Lisans
+## 📝 License
 
-MIT - Ama Patrick Bateman onaylamadı.
+MIT - But Patrick Bateman didn't approve.
 
-## 🔪 Uyarı
+## 🔪 Warning
 
-Bu konfigürasyon tamamen eğlence amaçlıdır. Gerçek şiddet içermez, sadece American Psycho filminden esinlenmiş karanlık bir estetik sunar. Kodlarken eğlenin!
+This configuration is purely for entertainment purposes. It contains no real violence, just a dark aesthetic inspired by the American Psycho movie. Have fun coding!
 
 ---
 
