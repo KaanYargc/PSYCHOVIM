@@ -24,6 +24,12 @@ Neovim itself is optional. If there is no usable Neovim 0.12+ on the machine, th
 
 Existing `~/.config/nvim` gets timestamped and backed up before PSYCHOVIM moves in. A failed clone restores it.
 
+The installer also syncs the plugin set before it returns. Network hiccups get three attempts. If GitHub still flakes out, the log is at `~/.cache/psychovim/lazy-sync.log` and the retry is:
+
+```bash
+pycho --headless '+Lazy! sync' '+qa'
+```
+
 Linux and macOS x86_64/arm64 are handled by the automatic Neovim bootstrap.
 
 ## The annoying Vim stuff
@@ -181,6 +187,8 @@ Broken icons: install a Nerd Font.
 No live grep: install `ripgrep`.
 
 Language server missing: open `:Mason`.
+
+Interrupted plugin clone: rerun `pycho --headless '+Lazy! sync' '+qa'`. If one plugin was left half-cloned, delete that plugin's directory under `~/.local/share/nvim/lazy/` and retry.
 
 ## Repo
 
