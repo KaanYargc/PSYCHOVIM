@@ -1,0 +1,170 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+CONFIG_DIR="${PSYCHOVIM_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/nvim}"
+NVIM_BIN="${PSYCHOVIM_NVIM:-}"
+BRANCH="${PSYCHOVIM_BRANCH:-main}"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psychovim"
+LAZY_ROOT="$DATA_HOME/nvim/lazy"
+SYNC_LOG="$CACHE_DIR/lazy-sync.log"
+PARSER_LOG="$CACHE_DIR/parser-sync.log"
+STAMP="$(date +%Y%m%d-%H%M%S)"
+
+bold='\033[1m'
+red='\033[31m'
+green='\033[32m'
+yellow='\033[33m'
+reset='\033[0m'
+
+say() { printf '%b\n' "$*"; }
+die() { say "${red}error:${reset} $*" >&2; exit 1; }
+
+resolve_nvim() {
+  if [[ -n "$NVIM_BIN" && -x "$NVIM_BIN" ]]; then
+    return 0
+  fi
+  if command -v nvim >/dev/null 2>&1; then
+    NVIM_BIN="$(command -v nvim)"
+    return 0
+  fi
+  die "nvim not found; rerun the PSYCHOVIM installer"
+}
+
+repair_plugin_checkout() {
+  local name="$1"
+  local dir="$LAZY_ROOT/$name"
+  local dirty backup
+
+  [[ -d "$dir/.git" ]] || return 0
+  dirty="$(git -C "$dir" status --porcelain 2>/dev/null || true)"
+  [[ -n "$dirty" ]] || return 0
+
+  mkdir -p "$CACHE_DIR/dirty-plugins"
+  backup="$CACHE_DIR/dirty-plugins/${name}-${STAMP}"
+  mv "$dir" "$backup"
+  say "plugin repair: $name -> $backup"
+}
+
+sync_plugins() {
+  local attempt
+  mkdir -p "$CACHE_DIR"
+  : > "$SYNC_LOG"
+  repair_plugin_checkout "nvim-lspconfig"
+
+  say "plugins      syncing"
+  for attempt in 1 2 3; do
+    if "$NVIM_BIN" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then
+      say "plugins      ${green}ok${reset}"
+      return 0
+    fi
+    say "plugins      ${yellow}retry $attempt/3${reset}"
+    sleep $(( attempt * 2 ))
+  done
+
+  say "plugins      ${yellow}incomplete${reset}"
+  say "log          $SYNC_LOG"
+  return 1
+}
+
+sync_parsers() {
+  mkdir -p "$CACHE_DIR"
+  : > "$PARSER_LOG"
+
+  if ! command -v tree-sitter >/dev/null 2>&1; then
+    say "parsers      skipped (tree-sitter CLI missing)"
+    return 0
+  fi
+
+  say "parsers      syncing"
+  if "$NVIM_BIN" --headless \
+    "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" \
+    "+qa" >>"$PARSER_LOG" 2>&1; then
+    say "parsers      ${green}ok${reset}"
+    return 0
+  fi
+
+  say "parsers      ${yellow}incomplete${reset}"
+  say "log          $PARSER_LOG"
+  return 1
+}
+
+update_psychovim() {
+  resolve_nvim
+  command -v git >/dev/null 2>&1 || die "git is required"
+  [[ -d "$CONFIG_DIR/.git" ]] || die "$CONFIG_DIR is not a git checkout"
+
+  if [[ -n "$(git -C "$CONFIG_DIR" status --porcelain)" ]]; then
+    say "config       ${yellow}dirty${reset}"
+    git -C "$CONFIG_DIR" status --short
+    die "refusing to update over local config changes"
+  fi
+
+  local before after count
+  before="$(git -C "$CONFIG_DIR" rev-parse HEAD)"
+
+  say "${red}${bold}PSYCHOVIM${reset} // UPDATE"
+  say "config       fetching $BRANCH"
+  git -C "$CONFIG_DIR" fetch --prune origin "$BRANCH"
+  git -C "$CONFIG_DIR" checkout -q "$BRANCH"
+  git -C "$CONFIG_DIR" merge --ff-only "origin/$BRANCH"
+
+  after="$(git -C "$CONFIG_DIR" rev-parse HEAD)"
+  if [[ "$before" == "$after" ]]; then
+    say "config       ${green}current${reset}"
+  else
+    count="$(git -C "$CONFIG_DIR" rev-list --count "$before..$after" 2>/dev/null || printf '?')"
+    say "config       ${green}${count} commit(s)${reset}"
+  fi
+
+  local rc=0
+  sync_plugins || rc=1
+  sync_parsers || rc=1
+
+  say ""
+  if (( rc == 0 )); then
+    say "${green}updated.${reset}"
+  else
+    say "${yellow}updated with network scars.${reset} logs are in $CACHE_DIR"
+  fi
+}
+
+show_help() {
+  cat <<'EOF'
+pycho [file|dir]
+pycho update       update PSYCHOVIM, plugins and parsers
+pycho settings     open the PSYCHOVIM settings panel
+pycho doctor       open Morning Routine
+pycho parsers      sync Treesitter parsers
+pycho help
+EOF
+}
+
+case "${1:-}" in
+  update)
+    shift
+    update_psychovim "$@"
+    ;;
+  settings)
+    shift
+    resolve_nvim
+    exec "$NVIM_BIN" "$@" "+PychoSettings"
+    ;;
+  doctor)
+    shift
+    resolve_nvim
+    exec "$NVIM_BIN" "$@" "+MorningRoutine"
+    ;;
+  parsers)
+    shift
+    resolve_nvim
+    sync_parsers
+    ;;
+  help|-h|--help)
+    show_help
+    ;;
+  *)
+    resolve_nvim
+    exec "$NVIM_BIN" "$@"
+    ;;
+esac
