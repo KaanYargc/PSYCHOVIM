@@ -62,7 +62,7 @@ function M.open()
     "  " .. pad("OFFICE       " .. cwd, inner),
     "  " .. pad(string.format("PERSONNEL    %d PLUGINS · %d LSP", plugin_count(), lsp_count()), inner),
     "",
-    "  " .. pad("Impressive. Very nice.", inner),
+    "  " .. pad("Look at that branch name.", inner),
     "",
   }
 
