@@ -18,21 +18,15 @@ STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP=""
 NVIM_EXEC=""
 TMP_DIR=""
+LAUNCHER_ONLY=false
 
-bold='\033[1m'
-red='\033[31m'
-green='\033[32m'
-yellow='\033[33m'
-reset='\033[0m'
+[[ "${1:-}" == "--launcher-only" ]] && LAUNCHER_ONLY=true
 
+bold='\033[1m'; red='\033[31m'; green='\033[32m'; yellow='\033[33m'; reset='\033[0m'
 say() { printf '%b\n' "$*"; }
 die() { say "${red}error:${reset} $*" >&2; exit 1; }
 
-cleanup() {
-  if [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]]; then
-    rm -rf "$TMP_DIR"
-  fi
-}
+cleanup() { [[ -n "$TMP_DIR" && -d "$TMP_DIR" ]] && rm -rf "$TMP_DIR" || true; }
 trap cleanup EXIT
 
 restore_backup() {
@@ -44,13 +38,10 @@ restore_backup() {
 }
 
 nvim_is_supported() {
-  local executable="$1"
-  local version_line major minor
-
+  local executable="$1" version_line major minor
   version_line="$($executable --version 2>/dev/null | head -n 1 || true)"
   if [[ "$version_line" =~ v([0-9]+)\.([0-9]+) ]]; then
-    major="${BASH_REMATCH[1]}"
-    minor="${BASH_REMATCH[2]}"
+    major="${BASH_REMATCH[1]}"; minor="${BASH_REMATCH[2]}"
     (( major > 0 || (major == 0 && minor >= 12) ))
     return
   fi
@@ -59,21 +50,9 @@ nvim_is_supported() {
 
 detect_neovim_asset() {
   local os arch platform asset_arch
-  os="$(uname -s)"
-  arch="$(uname -m)"
-
-  case "$os" in
-    Linux) platform="linux" ;;
-    Darwin) platform="macos" ;;
-    *) die "automatic Neovim install supports Linux/macOS only; got: $os" ;;
-  esac
-
-  case "$arch" in
-    x86_64|amd64) asset_arch="x86_64" ;;
-    arm64|aarch64) asset_arch="arm64" ;;
-    *) die "no official Neovim binary mapping for architecture: $arch" ;;
-  esac
-
+  os="$(uname -s)"; arch="$(uname -m)"
+  case "$os" in Linux) platform="linux" ;; Darwin) platform="macos" ;; *) die "automatic Neovim install supports Linux/macOS only; got: $os" ;; esac
+  case "$arch" in x86_64|amd64) asset_arch="x86_64" ;; arm64|aarch64) asset_arch="arm64" ;; *) die "no official Neovim binary mapping for architecture: $arch" ;; esac
   printf 'nvim-%s-%s' "$platform" "$asset_arch"
 }
 
@@ -81,221 +60,111 @@ install_neovim() {
   local asset url archive
   asset="$(detect_neovim_asset)"
   url="https://github.com/neovim/neovim/releases/latest/download/${asset}.tar.gz"
-
   TMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t psychovim)"
   archive="$TMP_DIR/neovim.tar.gz"
-
   say "nvim 0.12+ not found; pulling stable"
-  say "target: ${bold}${NVIM_HOME}${reset}"
-
-  curl -fL --retry 3 --connect-timeout 15 "$url" -o "$archive" \
-    || die "could not download Neovim"
-
-  rm -rf "$NVIM_HOME"
-  mkdir -p "$NVIM_HOME"
-  tar -xzf "$archive" --strip-components=1 -C "$NVIM_HOME" \
-    || die "could not extract Neovim"
-
+  curl -fL --retry 3 --connect-timeout 15 "$url" -o "$archive" || die "could not download Neovim"
+  rm -rf "$NVIM_HOME"; mkdir -p "$NVIM_HOME"
+  tar -xzf "$archive" --strip-components=1 -C "$NVIM_HOME" || die "could not extract Neovim"
   NVIM_EXEC="$NVIM_HOME/bin/nvim"
   [[ -x "$NVIM_EXEC" ]] || die "archive extracted without bin/nvim"
   nvim_is_supported "$NVIM_EXEC" || die "downloaded Neovim is older than 0.12"
-
   mkdir -p "$BIN_DIR"
-  if [[ ! -e "$NVIM_LINK" || -L "$NVIM_LINK" ]]; then
-    ln -sfn "$NVIM_EXEC" "$NVIM_LINK"
-    say "link: ${bold}${NVIM_LINK}${reset}"
-  else
-    say "${yellow}warning:${reset} $NVIM_LINK exists and is not a symlink; leaving it alone"
-  fi
-
+  if [[ ! -e "$NVIM_LINK" || -L "$NVIM_LINK" ]]; then ln -sfn "$NVIM_EXEC" "$NVIM_LINK"; fi
   say "nvim: $($NVIM_EXEC --version | head -n 1)"
 }
 
 resolve_neovim() {
+  if [[ -x "$NVIM_HOME/bin/nvim" ]] && nvim_is_supported "$NVIM_HOME/bin/nvim"; then NVIM_EXEC="$NVIM_HOME/bin/nvim"; return; fi
   if command -v nvim >/dev/null 2>&1; then
-    local existing
-    existing="$(command -v nvim)"
-    if nvim_is_supported "$existing"; then
-      NVIM_EXEC="$existing"
-      say "nvim: $($NVIM_EXEC --version | head -n 1) (${NVIM_EXEC})"
-      return
-    fi
-
-    say "${yellow}old nvim:${reset} $($existing --version | head -n 1)"
+    local existing="$(command -v nvim)"
+    if nvim_is_supported "$existing"; then NVIM_EXEC="$existing"; say "nvim: $($NVIM_EXEC --version | head -n 1)"; return; fi
   fi
-
   install_neovim
 }
 
 ensure_launcher_path() {
-  case ":$PATH:" in
-    *":$BIN_DIR:"*) return 0 ;;
-  esac
-
-  local shell_name profile export_line
+  case ":$PATH:" in *":$BIN_DIR:"*) return 0 ;; esac
+  local shell_name profile="" export_line
   shell_name="$(basename "${SHELL:-}")"
-  profile=""
-
-  if [[ "$BIN_DIR" == "$HOME/.local/bin" ]]; then
-    export_line='export PATH="$HOME/.local/bin:$PATH"'
-  else
-    export_line="export PATH=\"$BIN_DIR:\$PATH\""
-  fi
-
-  case "$shell_name" in
-    zsh) profile="$HOME/.zshrc" ;;
-    bash) profile="$HOME/.bashrc" ;;
-  esac
-
+  [[ "$BIN_DIR" == "$HOME/.local/bin" ]] && export_line='export PATH="$HOME/.local/bin:$PATH"' || export_line="export PATH=\"$BIN_DIR:\$PATH\""
+  case "$shell_name" in zsh) profile="$HOME/.zshrc" ;; bash) profile="$HOME/.bashrc" ;; esac
   if [[ -n "$profile" ]]; then
     touch "$profile"
-    if ! grep -Fq '# PSYCHOVIM launcher' "$profile"; then
-      {
-        printf '\n# PSYCHOVIM launcher\n'
-        printf '%s\n' "$export_line"
-      } >> "$profile"
-      say "path: added ${bold}${BIN_DIR}${reset} to ${bold}${profile}${reset}"
-      say "open a new shell before running ${bold}pycho${reset}"
-    fi
-  else
-    say "${yellow}warning:${reset} $BIN_DIR is not in PATH"
+    if ! grep -Fq '# PSYCHOVIM launcher' "$profile"; then printf '\n# PSYCHOVIM launcher\n%s\n' "$export_line" >> "$profile"; fi
   fi
 }
 
 install_launcher() {
+  [[ -f "$TARGET/bin/pycho" ]] || die "$TARGET/bin/pycho is missing; update/reinstall PSYCHOVIM first"
   mkdir -p "$BIN_DIR"
-
-  {
-    printf '#!/usr/bin/env bash\n'
-    printf 'PREFERRED_NVIM=%q\n' "$NVIM_EXEC"
-    cat <<'EOF'
-
-if [[ -x "$PREFERRED_NVIM" ]]; then
-  exec "$PREFERRED_NVIM" "$@"
-fi
-
-if command -v nvim >/dev/null 2>&1; then
-  exec nvim "$@"
-fi
-
-printf '%s\n' 'pycho: nvim not found' >&2
-exit 127
+  cat > "$PYCHO_BIN" <<EOF
+#!/usr/bin/env bash
+exec bash $(printf '%q' "$TARGET/bin/pycho") "\$@"
 EOF
-  } > "$PYCHO_BIN"
-
   chmod 755 "$PYCHO_BIN"
   say "launcher: ${bold}${PYCHO_BIN}${reset}"
   ensure_launcher_path
 }
 
 repair_plugin_checkout() {
-  local name="$1"
-  local dir="$LAZY_ROOT/$name"
-  local dirty backup
-
+  local name="$1" dir="$LAZY_ROOT/$name" dirty backup
   [[ -d "$dir/.git" ]] || return 0
   dirty="$(git -C "$dir" status --porcelain 2>/dev/null || true)"
   [[ -n "$dirty" ]] || return 0
-
   mkdir -p "$CACHE_DIR/dirty-plugins"
   backup="$CACHE_DIR/dirty-plugins/${name}-${STAMP}"
   mv "$dir" "$backup"
-  say "plugins: reset dirty $name"
-  say "backup: ${bold}${backup}${reset}"
+  say "plugin repair: $name -> $backup"
 }
 
 sync_plugins() {
   local attempt
-  mkdir -p "$CACHE_DIR"
-  : > "$SYNC_LOG"
-
-  # This checkout has historically been modified by older LSP tooling. Lazy
-  # correctly refuses to overwrite local changes, so preserve and reinstall it.
+  mkdir -p "$CACHE_DIR"; : > "$SYNC_LOG"
   repair_plugin_checkout "nvim-lspconfig"
-
-  say "plugins: syncing (2 jobs max)"
+  say "plugins: syncing"
   for attempt in 1 2 3; do
-    if "$NVIM_EXEC" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then
-      say "plugins: ${green}ok${reset}"
-      return 0
-    fi
-
-    say "${yellow}plugins:${reset} sync failed ($attempt/3)"
-    if (( attempt < 3 )); then
-      sleep $(( attempt * 3 ))
-    fi
+    if "$NVIM_EXEC" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then say "plugins: ${green}ok${reset}"; return 0; fi
+    say "${yellow}plugins:${reset} retry $attempt/3"; sleep $(( attempt * 2 ))
   done
-
-  say "${yellow}plugins:${reset} install incomplete"
-  say "log: ${bold}${SYNC_LOG}${reset}"
-  say "retry: ${bold}pycho --headless '+Lazy! sync' '+qa'${reset}"
+  say "${yellow}plugins:${reset} incomplete — $SYNC_LOG"
   return 0
 }
 
 sync_parsers() {
-  local attempt
-  local languages=(bash c cpp go javascript json lua markdown python rust toml tsx typescript vim vimdoc yaml)
-
-  mkdir -p "$CACHE_DIR"
-  : > "$PARSER_LOG"
-
-  if ! command -v tree-sitter >/dev/null 2>&1; then
-    say "${yellow}parsers:${reset} tree-sitter CLI missing; skipping parser bootstrap"
-    say "install tree-sitter-cli 0.26+ and run: ${bold}:PsychoParsers${reset}"
-    return 0
+  mkdir -p "$CACHE_DIR"; : > "$PARSER_LOG"
+  command -v tree-sitter >/dev/null 2>&1 || { say "parsers: skipped (tree-sitter CLI missing)"; return 0; }
+  say "parsers: syncing"
+  if "$NVIM_EXEC" --headless "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" "+qa" >>"$PARSER_LOG" 2>&1; then
+    say "parsers: ${green}ok${reset}"
+  else
+    say "${yellow}parsers:${reset} incomplete — $PARSER_LOG"
   fi
-
-  say "parsers: syncing serially"
-  for attempt in 1 2 3; do
-    if "$NVIM_EXEC" --headless \
-      "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" \
-      "+qa" >>"$PARSER_LOG" 2>&1; then
-      say "parsers: ${green}ok${reset}"
-      return 0
-    fi
-
-    say "${yellow}parsers:${reset} sync failed ($attempt/3)"
-    if (( attempt < 3 )); then
-      sleep $(( attempt * 3 ))
-    fi
-  done
-
-  say "${yellow}parsers:${reset} incomplete"
-  say "log: ${bold}${PARSER_LOG}${reset}"
-  say "retry in Neovim: ${bold}:PsychoParsers${reset}"
-  return 0
 }
 
 say "${red}${bold}PSYCHOVIM${reset} // SETUP"
-say ""
-
 command -v git >/dev/null 2>&1 || die "git is required"
 command -v curl >/dev/null 2>&1 || die "curl is required"
 command -v tar >/dev/null 2>&1 || die "tar is required"
-
 resolve_neovim
+
+if $LAUNCHER_ONLY; then
+  install_launcher
+  say "${green}launcher updated.${reset} try: pycho help"
+  exit 0
+fi
 
 if [[ -e "$TARGET" || -L "$TARGET" ]]; then
   BACKUP="${TARGET}.backup-${STAMP}"
-  say "config: $TARGET"
   say "backup: ${bold}${BACKUP}${reset}"
   mv "$TARGET" "$BACKUP"
 fi
-
 mkdir -p "$(dirname "$TARGET")"
-
 say "clone: ${bold}${REPO_URL}${reset} -> ${bold}${TARGET}${reset} (${BRANCH})"
-if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TARGET"; then
-  restore_backup
-  die "clone failed"
-fi
+if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TARGET"; then restore_backup; die "clone failed"; fi
 
 install_launcher
 sync_plugins
 sync_parsers
-
-say ""
 say "${green}${bold}done.${reset} run: ${bold}pycho${reset}"
-if [[ -n "$BACKUP" ]]; then
-  say "old config: ${bold}${BACKUP}${reset}"
-fi
+[[ -n "$BACKUP" ]] && say "old config: ${bold}${BACKUP}${reset}"
