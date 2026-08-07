@@ -64,10 +64,18 @@ map("i", "<C-S-z>", function()
 end, { desc = "PychoRedo" })
 
 map("n", "<C-p>", function()
-  if enabled("familiar_shortcuts") then vim.cmd("Telescope find_files") else feed_native("<C-p>") end
+  if enabled("familiar_shortcuts") and enabled("telescope") then
+    vim.cmd("Telescope find_files")
+  else
+    feed_native("<C-p>")
+  end
 end, { desc = "PychoFind files" })
 map("n", "<C-f>", function()
-  if enabled("familiar_shortcuts") then vim.cmd("Telescope current_buffer_fuzzy_find") else feed_native("<C-f>") end
+  if enabled("familiar_shortcuts") and enabled("telescope") then
+    vim.cmd("Telescope current_buffer_fuzzy_find")
+  else
+    feed_native("<C-f>")
+  end
 end, { desc = "PychoFind in file" })
 map("n", "<C-a>", function()
   if enabled("familiar_shortcuts") then vim.cmd("normal! ggVG") else feed_native("<C-a>") end
