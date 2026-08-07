@@ -15,8 +15,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Validate installer
-        run: bash -n install.sh
+      - name: Validate shell
+        run: |
+          bash -n install.sh
+          bash -n bin/pycho
 
       - name: Set up Neovim
         uses: rhysd/action-setup-vim@v1
@@ -44,7 +46,9 @@ jobs:
         run: |
           nvim --headless \
             "+lua require('psychovim.theme').apply('sanity')" \
-            "+lua assert(type(require('psychovim.smart_actions').save) == 'function')" \
+            "+lua assert(type(require('psychovim.pycho_actions').save) == 'function')" \
+            "+lua assert(type(require('psychovim.pycho_close').open) == 'function')" \
+            "+lua assert(type(require('psychovim.settings').get) == 'function')" \
             "+lua assert(type(require('psychovim.dorsia').open) == 'function')" \
             "+lua assert(type(require('psychovim.business_card').open) == 'function')" \
             +qa
