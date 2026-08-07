@@ -46,4 +46,30 @@ THIS IS NOT AN EXIT.
       }
     end,
   },
+
+  {
+    "nvim-treesitter/nvim-treesitter",
+    -- Parser downloads belong in setup/install, not in every editor startup.
+    config = function()
+      local treesitter = require("nvim-treesitter")
+      local languages = {
+        "bash", "c", "cpp", "go", "javascript", "json", "lua", "markdown",
+        "python", "rust", "toml", "tsx", "typescript", "vim", "vimdoc", "yaml",
+      }
+
+      treesitter.setup({})
+
+      vim.api.nvim_create_user_command("PsychoParsers", function()
+        vim.notify("parser sync started")
+        treesitter.install(languages)
+      end, { desc = "Install PSYCHOVIM Treesitter parsers" })
+
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = languages,
+        callback = function(event)
+          pcall(vim.treesitter.start, event.buf)
+        end,
+      })
+    end,
+  },
 }
