@@ -22,6 +22,7 @@ PSYCHOVIM now targets modern Neovim and includes:
 - a custom Snacks dashboard
 - **SmartClose**, a built-in save/quit popup on `Ctrl+C` and `Ctrl+D`
 - one-command installer with automatic config backup
+- the `pycho` launcher command
 - modular options, keymaps, autocmds, and plugin configuration
 
 ## Requirements
@@ -37,7 +38,7 @@ PSYCHOVIM now targets modern Neovim and includes:
 
 ### One command
 
-After this version is merged to `main`, install PSYCHOVIM with:
+Install PSYCHOVIM with:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OnurByte/PSYCHOVIM/main/install.sh | bash
@@ -49,13 +50,25 @@ The installer:
 - warns if Neovim is missing or older than 0.12
 - backs up an existing config to `~/.config/nvim.backup-YYYYMMDD-HHMMSS`
 - clones PSYCHOVIM to `${XDG_CONFIG_HOME:-~/.config}/nvim`
+- installs a `pycho` launcher under `~/.local/bin`
+- adds `~/.local/bin` to Bash/Zsh PATH when needed
+- restores the previous Neovim config automatically if cloning fails
 - leaves system packages alone instead of silently changing your machine
 
-To test the installer from the development branch before merge:
+After installation, launch PSYCHOVIM with:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OnurByte/PSYCHOVIM/develop/psychovim-v1/install.sh | PSYCHOVIM_BRANCH=develop/psychovim-v1 bash
+pycho
 ```
+
+You can also open files and directories directly:
+
+```bash
+pycho app.lua
+pycho .
+```
+
+If the installer had to add `~/.local/bin` to PATH, open a new terminal or source your shell config before running `pycho`.
 
 ### Manual install
 
@@ -175,6 +188,14 @@ PSYCHOVIM should feel distinctive in actual use, not only in screenshots. Opinio
 The old configuration used Packer and committed generated `packer_compiled.lua` output. v1 removes that artifact and moves dependency management to `lazy.nvim`.
 
 ## Troubleshooting
+
+### `pycho` command not found
+
+The installer places the launcher at `~/.local/bin/pycho`. Open a new terminal after installation. If your shell does not load that directory automatically, add this to your shell profile:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
 
 ### Plugins fail to install
 
