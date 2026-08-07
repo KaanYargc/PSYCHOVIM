@@ -12,6 +12,8 @@ jobs:
   neovim:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    env:
+      PSYCHOVIM_MAINTENANCE: "1"
     steps:
       - uses: actions/checkout@v4
 
@@ -48,7 +50,7 @@ jobs:
             "+lua require('psychovim.theme').apply('sanity')" \
             "+lua assert(type(require('psychovim.pycho_actions').save) == 'function')" \
             "+lua assert(type(require('psychovim.pycho_close').open) == 'function')" \
-            "+lua assert(type(require('psychovim.settings').get) == 'function')" \
+            "+lua local s=require('psychovim.settings'); assert(type(s.get) == 'function'); assert(s.get('auto_update_config') ~= nil); assert(s.get('tab_width') ~= nil)" \
             "+lua assert(type(require('psychovim.dorsia').open) == 'function')" \
             "+lua assert(type(require('psychovim.business_card').open) == 'function')" \
             +qa
