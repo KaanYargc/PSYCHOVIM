@@ -2,11 +2,29 @@ return {
   {
     "folke/snacks.nvim",
     opts = function(_, opts)
+      local settings = require("psychovim.settings")
+
       opts.input = { enabled = true }
       opts.picker = vim.tbl_deep_extend("force", opts.picker or {}, {
         enabled = true,
         ui_select = true,
       })
+
+      local function find_files()
+        if settings.get("telescope") ~= false and vim.fn.exists(":Telescope") == 2 then
+          vim.cmd("Telescope find_files")
+        else
+          Snacks.picker.files()
+        end
+      end
+
+      local function recent_files()
+        if settings.get("telescope") ~= false and vim.fn.exists(":Telescope") == 2 then
+          vim.cmd("Telescope oldfiles")
+        else
+          Snacks.picker.recent()
+        end
+      end
 
       opts.dashboard = opts.dashboard or {}
       opts.dashboard.preset = opts.dashboard.preset or {}
@@ -20,8 +38,8 @@ VICE PRESIDENT
 THIS IS NOT AN EXIT.
 ]]
       opts.dashboard.preset.keys = {
-        { icon = "  ", key = "f", desc = "Find File", action = ":Telescope find_files" },
-        { icon = "  ", key = "r", desc = "Recent Files", action = ":Telescope oldfiles" },
+        { icon = "  ", key = "f", desc = "Find File", action = find_files },
+        { icon = "  ", key = "r", desc = "Recent Files", action = recent_files },
         { icon = "  ", key = "n", desc = "New File", action = ":ene | startinsert" },
         { icon = "  ", key = "s", desc = "Settings", action = ":PychoSettings" },
         { icon = "  ", key = "b", desc = "Business Card", action = ":BusinessCard" },
