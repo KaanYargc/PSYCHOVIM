@@ -1,16 +1,19 @@
 local group = vim.api.nvim_create_augroup("Psychovim", { clear = true })
+local settings = require("psychovim.settings")
 
 vim.api.nvim_create_autocmd("TextYankPost", {
   group = group,
   callback = function()
-    vim.highlight.on_yank({ higroup = "IncSearch", timeout = 180 })
+    if settings.get("highlight_yank") then
+      vim.highlight.on_yank({ higroup = "IncSearch", timeout = 180 })
+    end
   end,
 })
 
 vim.api.nvim_create_autocmd("BufWritePre", {
   group = group,
   callback = function(args)
-    if vim.bo[args.buf].buftype ~= "" then
+    if not settings.get("trim_whitespace") or vim.bo[args.buf].buftype ~= "" then
       return
     end
 
@@ -23,6 +26,7 @@ vim.api.nvim_create_autocmd("BufWritePre", {
 vim.api.nvim_create_autocmd("BufReadPost", {
   group = group,
   callback = function(args)
+    if not settings.get("restore_cursor") then return end
     local mark = vim.api.nvim_buf_get_mark(args.buf, '"')
     local lines = vim.api.nvim_buf_line_count(args.buf)
     if mark[1] > 1 and mark[1] <= lines then
@@ -40,19 +44,20 @@ vim.api.nvim_create_autocmd("FileType", {
 })
 
 local messages = {
-  "Let's see Paul Allen's config...",
-  "I have to return some videotapes.",
-  "Try getting a reservation at Dorsia now.",
-  "Do you like Huey Lewis and the News?",
+  "Market opens. Tabs close.",
+  "No visible defects.",
+  "Reservations remain unlikely.",
+  "Typography is a competitive sport.",
 }
 
 vim.api.nvim_create_autocmd("VimEnter", {
   group = group,
   once = true,
   callback = function()
+    if not settings.get("startup_quip") then return end
     math.randomseed(vim.uv.hrtime())
     vim.schedule(function()
-      vim.notify("PSYCHOVIM — " .. messages[math.random(#messages)], vim.log.levels.INFO)
+      vim.notify("Pycho · " .. messages[math.random(#messages)], vim.log.levels.INFO)
     end)
   end,
 })
