@@ -23,11 +23,12 @@ THIS IS NOT AN EXIT.
         { icon = "  ", key = "f", desc = "Find File", action = ":Telescope find_files" },
         { icon = "  ", key = "r", desc = "Recent Files", action = ":Telescope oldfiles" },
         { icon = "  ", key = "n", desc = "New File", action = ":ene | startinsert" },
+        { icon = "  ", key = "s", desc = "Settings", action = ":PychoSettings" },
         { icon = "  ", key = "b", desc = "Business Card", action = ":BusinessCard" },
         { icon = "  ", key = "d", desc = "Dorsia", action = ":Dorsia" },
         { icon = "  ", key = "m", desc = "Morning Routine", action = ":MorningRoutine" },
         { icon = "  ", key = "l", desc = "Plugin Inventory", action = ":Lazy" },
-        { icon = "  ", key = "q", desc = "SmartClose", action = ":lua require('psychovim.smart_close').open()" },
+        { icon = "  ", key = "q", desc = "PychoClose", action = ":lua require('psychovim.pycho_close').open()" },
       }
     end,
   },
@@ -49,7 +50,6 @@ THIS IS NOT AN EXIT.
 
   {
     "nvim-treesitter/nvim-treesitter",
-    -- Parser downloads belong in setup/install, not in every editor startup.
     config = function()
       local treesitter = require("nvim-treesitter")
       local languages = {
@@ -59,8 +59,8 @@ THIS IS NOT AN EXIT.
 
       treesitter.setup({})
 
-      vim.api.nvim_create_user_command("PsychoParsers", function()
-        vim.notify("parser sync started")
+      vim.api.nvim_create_user_command("PychoParsers", function()
+        vim.notify("Pycho · parser sync started")
         treesitter.install(languages)
       end, { desc = "Install PSYCHOVIM Treesitter parsers" })
 
