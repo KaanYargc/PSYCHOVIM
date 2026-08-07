@@ -1,5 +1,10 @@
 local map = vim.keymap.set
-local actions = require("psychovim.smart_actions")
+local actions = require("psychovim.pycho_actions")
+local settings = require("psychovim.settings")
+
+local function enabled(key)
+  return settings.get(key) ~= false
+end
 
 local function feed_native(keys)
   local term = vim.api.nvim_replace_termcodes(keys, true, false, true)
@@ -10,7 +15,7 @@ map("i", "jk", "<Esc>", { desc = "Exit insert mode" })
 map("i", "kj", "<Esc>", { desc = "Exit insert mode" })
 
 local function pycho_close_or_native(key)
-  if vim.g.pycho_close == false then
+  if not enabled("pycho_close") then
     feed_native(key)
     return
   end
@@ -21,7 +26,7 @@ local function pycho_close_or_native(key)
   elseif mode:sub(1, 1) == "t" then
     feed_native("<C-\\><C-n>")
   end
-  require("psychovim.smart_close").open()
+  require("psychovim.pycho_close").open()
 end
 
 for _, mode in ipairs({ "n", "i", "x", "t" }) do
@@ -30,43 +35,47 @@ for _, mode in ipairs({ "n", "i", "x", "t" }) do
 end
 
 local function pycho_save_or_native()
-  if vim.g.pycho_save == false then feed_native("<C-s>"); return end
+  if not enabled("pycho_save") then feed_native("<C-s>"); return end
   actions.save()
 end
 map("n", "<C-s>", pycho_save_or_native, { desc = "PychoSave" })
 map("x", "<C-s>", function()
-  if vim.g.pycho_save == false then feed_native("<C-s>") else feed_native("<Esc>"); vim.schedule(actions.save) end
+  if not enabled("pycho_save") then feed_native("<C-s>") else feed_native("<Esc>"); vim.schedule(actions.save) end
 end, { desc = "PychoSave" })
 map("i", "<C-s>", function()
-  if vim.g.pycho_save == false then feed_native("<C-s>") else vim.cmd("stopinsert"); actions.save(); vim.cmd("startinsert") end
+  if not enabled("pycho_save") then feed_native("<C-s>") else vim.cmd("stopinsert"); actions.save(); vim.cmd("startinsert") end
 end, { desc = "PychoSave" })
 map("t", "<C-s>", function()
-  if vim.g.pycho_save == false then feed_native("<C-s>") else actions.terminal_ctrl_s() end
+  if not enabled("pycho_save") then feed_native("<C-s>") else actions.terminal_ctrl_s() end
 end, { desc = "PychoSave terminal guard" })
 
-local function ctrl_z(mode)
-  if vim.g.pycho_ctrl_z_undo == false then feed_native("<C-z>"); return end
+local function undo_or_native(mode)
+  if not enabled("ctrl_z_undo") then feed_native("<C-z>"); return end
   if mode == "i" then vim.cmd("undo"); vim.cmd("startinsert") else vim.cmd("undo") end
 end
-map("n", "<C-z>", function() ctrl_z("n") end, { desc = "PychoUndo" })
-map("x", "<C-z>", function() feed_native("<Esc>"); vim.schedule(function() ctrl_z("n") end) end, { desc = "PychoUndo" })
-map("i", "<C-z>", function() vim.cmd("stopinsert"); ctrl_z("i") end, { desc = "PychoUndo" })
-map("n", "<C-S-z>", "<C-r>", { desc = "Redo" })
-map("i", "<C-S-z>", "<C-o><C-r>", { desc = "Redo" })
+map("n", "<C-z>", function() undo_or_native("n") end, { desc = "PychoUndo" })
+map("x", "<C-z>", function() feed_native("<Esc>"); vim.schedule(function() undo_or_native("n") end) end, { desc = "PychoUndo" })
+map("i", "<C-z>", function() vim.cmd("stopinsert"); undo_or_native("i") end, { desc = "PychoUndo" })
+map("n", "<C-S-z>", function()
+  if enabled("ctrl_z_undo") then feed_native("<C-r>") else feed_native("<C-S-z>") end
+end, { desc = "PychoRedo" })
+map("i", "<C-S-z>", function()
+  if enabled("ctrl_z_undo") then feed_native("<C-o><C-r>") else feed_native("<C-S-z>") end
+end, { desc = "PychoRedo" })
 
 map("n", "<C-p>", function()
-  if vim.g.pycho_familiar_shortcuts == false then feed_native("<C-p>") else vim.cmd("Telescope find_files") end
+  if enabled("familiar_shortcuts") then vim.cmd("Telescope find_files") else feed_native("<C-p>") end
 end, { desc = "PychoFind files" })
 map("n", "<C-f>", function()
-  if vim.g.pycho_familiar_shortcuts == false then feed_native("<C-f>") else vim.cmd("Telescope current_buffer_fuzzy_find") end
+  if enabled("familiar_shortcuts") then vim.cmd("Telescope current_buffer_fuzzy_find") else feed_native("<C-f>") end
 end, { desc = "PychoFind in file" })
 map("n", "<C-a>", function()
-  if vim.g.pycho_familiar_shortcuts == false then feed_native("<C-a>") else vim.cmd("normal! ggVG") end
+  if enabled("familiar_shortcuts") then vim.cmd("normal! ggVG") else feed_native("<C-a>") end
 end, { desc = "PychoSelect all" })
 
 map("n", "<leader>w", actions.save, { desc = "PychoSave" })
 map("n", "<leader>q", "<cmd>quit<cr>", { desc = "Quit window" })
-map("n", "<leader>Q", function() require("psychovim.smart_close").open() end, { desc = "PychoClose" })
+map("n", "<leader>Q", function() require("psychovim.pycho_close").open() end, { desc = "PychoClose" })
 map("n", "<leader>h", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 
 map("n", "<C-h>", "<C-w>h", { desc = "Window left" })
@@ -82,7 +91,7 @@ map("n", "<S-Tab>", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
 map("n", "<leader>bd", actions.close_buffer, { desc = "PychoBufferClose" })
 
 map("v", "p", function()
-  if vim.g.pycho_safe_visual_paste == false then feed_native("p") else feed_native('"_dP') end
+  if enabled("safe_visual_paste") then feed_native('"_dP') else feed_native("p") end
 end, { desc = "PychoPaste" })
 map("v", "<", "<gv", { desc = "Indent left" })
 map("v", ">", ">gv", { desc = "Indent right" })
@@ -95,4 +104,6 @@ map("n", "[d", vim.diagnostic.goto_prev, { desc = "Previous diagnostic" })
 map("n", "]d", vim.diagnostic.goto_next, { desc = "Next diagnostic" })
 map("n", "<leader>dd", vim.diagnostic.open_float, { desc = "Line diagnostics" })
 map("n", "<leader>tt", "<cmd>terminal<cr>", { desc = "Terminal" })
-map("t", "<Esc>", "<C-\\><C-n>", { desc = "Terminal normal mode" })
+map("t", "<Esc>", function()
+  if enabled("terminal_escape") then feed_native("<C-\\><C-n>") else feed_native("<Esc>") end
+end, { desc = "PychoTerminalEsc" })
