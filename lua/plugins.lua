@@ -1,440 +1,285 @@
--- ╔═══════════════════════════════════════════════════════════════╗
--- ║                    PychoVim Plugins                           ║
--- ║         "Look at that subtle off-white coloring..."           ║
--- ╚═══════════════════════════════════════════════════════════════╝
-
-return require("packer").startup(function(use)
-    -- Plugin manager (the foundation of control)
-    use "wbthomason/packer.nvim"
-
-    -- ═══════════════════════════════════════════════════════════
-    --  COLOR SCHEMES (Blood & Darkness)
-    -- ═══════════════════════════════════════════════════════════
-
-    -- Primary theme: Dark, sophisticated, psychotic
-    use {
-        "catppuccin/nvim",
-        as = "catppuccin",
-        config = function()
-            require("catppuccin").setup({
-                flavour = "mocha", -- Dark as Patrick's soul
-                transparent_background = false,
-                term_colors = true,
-                styles = {
-                    comments = { "italic" },
-                    conditionals = { "bold" },
-                    loops = { "bold" },
-                    functions = { "bold" },
-                    keywords = { "italic" },
-                    strings = {},
-                    variables = {},
-                    numbers = {},
-                    booleans = { "bold" },
-                    properties = {},
-                    types = { "bold" },
-                },
-                color_overrides = {
-                    mocha = {
-                        base = "#0d0d0d",      -- Pitch black
-                        mantle = "#000000",    -- Void
-                        crust = "#000000",     -- Abyss
-                        text = "#e0e0e0",      -- Cold white
-                        red = "#8b0000",       -- Blood red
-                        maroon = "#800000",    -- Dark blood
-                    },
-                },
-                custom_highlights = function(colors)
-                    return {
-                        CursorLine = { bg = "#1a1a1a" },
-                        LineNr = { fg = "#4a4a4a" },
-                        CursorLineNr = { fg = "#8b0000", style = { "bold" } },
-                    }
-                end,
-            })
-            vim.cmd.colorscheme("catppuccin")
+return {
+  {
+    "catppuccin/nvim",
+    name = "catppuccin",
+    priority = 1000,
+    config = function()
+      require("catppuccin").setup({
+        flavour = "mocha",
+        background = { light = "latte", dark = "mocha" },
+        transparent_background = false,
+        term_colors = true,
+        styles = {
+          comments = { "italic" },
+          conditionals = { "bold" },
+          functions = { "bold" },
+          keywords = { "italic" },
+        },
+        color_overrides = {
+          mocha = {
+            base = "#0b0b0d",
+            mantle = "#070709",
+            crust = "#030304",
+            text = "#e6e6e6",
+            red = "#b11226",
+            maroon = "#7f0d1d",
+          },
+        },
+        custom_highlights = function()
+          return {
+            CursorLine = { bg = "#151518" },
+            LineNr = { fg = "#45454f" },
+            CursorLineNr = { fg = "#b11226", style = { "bold" } },
+          }
         end,
-    }
+      })
+      vim.cmd.colorscheme("catppuccin")
+    end,
+  },
 
-    -- Alternative themes (for different moods)
-    use "folke/tokyonight.nvim"
-    use "EdenEast/nightfox.nvim"
-    use { "rose-pine/neovim", as = "rose-pine" }
+  { "nvim-tree/nvim-web-devicons", lazy = true },
 
-    -- ═══════════════════════════════════════════════════════════
-    --  UI ENHANCEMENTS (Aesthetic Perfection)
-    -- ═══════════════════════════════════════════════════════════
+  {
+    "nvim-lualine/lualine.nvim",
+    event = "VeryLazy",
+    dependencies = { "nvim-tree/nvim-web-devicons" },
+    opts = {
+      options = {
+        theme = "auto",
+        globalstatus = true,
+        section_separators = { left = "", right = "" },
+        component_separators = { left = "│", right = "│" },
+      },
+      sections = {
+        lualine_a = { { "mode", fmt = function(value) return "🔪 " .. value end } },
+        lualine_b = { "branch", "diff" },
+        lualine_c = { { "filename", path = 1 } },
+        lualine_x = { "diagnostics", "filetype" },
+        lualine_y = { "progress" },
+        lualine_z = { "location" },
+      },
+    },
+  },
 
-    -- Status line (business card quality)
-    use {
-        "nvim-lualine/lualine.nvim",
-        requires = { "nvim-tree/nvim-web-devicons" },
-        config = function()
-            require("lualine").setup({
-                options = {
-                    theme = "auto",
-                    component_separators = { left = "│", right = "│" },
-                    section_separators = { left = "", right = "" },
-                    globalstatus = true,
-                },
-                sections = {
-                    lualine_a = {
-                        {
-                            "mode",
-                            fmt = function(str)
-                                return "🔪 " .. str
-                            end,
-                        },
-                    },
-                    lualine_b = { "branch", "diff" },
-                    lualine_c = {
-                        {
-                            "filename",
-                            path = 1,
-                            symbols = {
-                                modified = " 💀",
-                                readonly = " 🔒",
-                                unnamed = " 👤",
-                            },
-                        },
-                    },
-                    lualine_x = {
-                        {
-                            "diagnostics",
-                            sources = { "nvim_diagnostic" },
-                            symbols = { error = "💥 ", warn = "⚠️  ", info = "ℹ️  ", hint = "💡 " },
-                        },
-                        "encoding",
-                        "fileformat",
-                        "filetype",
-                    },
-                    lualine_y = { "progress" },
-                    lualine_z = { "location" },
-                },
-            })
+  {
+    "akinsho/bufferline.nvim",
+    version = "*",
+    event = "VeryLazy",
+    dependencies = { "nvim-tree/nvim-web-devicons" },
+    opts = {
+      options = {
+        diagnostics = "nvim_lsp",
+        separator_style = "slant",
+        show_close_icon = false,
+        always_show_bufferline = false,
+      },
+    },
+  },
+
+  {
+    "folke/which-key.nvim",
+    event = "VeryLazy",
+    opts = { preset = "modern", delay = 300 },
+  },
+
+  {
+    "nvim-telescope/telescope.nvim",
+    cmd = "Telescope",
+    dependencies = { "nvim-lua/plenary.nvim" },
+    opts = {
+      defaults = {
+        prompt_prefix = "🔍 ",
+        selection_caret = "▶ ",
+        path_display = { "smart" },
+        layout_config = { horizontal = { preview_width = 0.55 } },
+      },
+    },
+    keys = {
+      { "<leader>ff", "<cmd>Telescope find_files<cr>", desc = "Find files" },
+      { "<leader>fg", "<cmd>Telescope live_grep<cr>", desc = "Live grep" },
+      { "<leader>fb", "<cmd>Telescope buffers<cr>", desc = "Buffers" },
+      { "<leader>fr", "<cmd>Telescope oldfiles<cr>", desc = "Recent files" },
+      { "<leader>fh", "<cmd>Telescope help_tags<cr>", desc = "Help tags" },
+    },
+  },
+
+  {
+    "nvim-tree/nvim-tree.lua",
+    cmd = { "NvimTreeToggle", "NvimTreeFocus" },
+    dependencies = { "nvim-tree/nvim-web-devicons" },
+    opts = {
+      sync_root_with_cwd = true,
+      respect_buf_cwd = true,
+      update_focused_file = { enable = true },
+      view = { width = 34 },
+      renderer = {
+        group_empty = true,
+        highlight_git = "name",
+        icons = { show = { git = true, folder = true, file = true, folder_arrow = true } },
+      },
+      filters = { custom = { "^.git$" } },
+    },
+    keys = {
+      { "<leader>e", "<cmd>NvimTreeToggle<cr>", desc = "Explorer" },
+      { "<leader>o", "<cmd>NvimTreeFocus<cr>", desc = "Focus explorer" },
+    },
+  },
+
+  {
+    "nvim-treesitter/nvim-treesitter",
+    build = ":TSUpdate",
+    event = { "BufReadPost", "BufNewFile" },
+    opts = {
+      ensure_installed = { "bash", "c", "cpp", "go", "javascript", "json", "lua", "markdown", "python", "rust", "toml", "tsx", "typescript", "vim", "vimdoc", "yaml" },
+      highlight = { enable = true },
+      indent = { enable = true },
+    },
+    config = function(_, opts)
+      require("nvim-treesitter.configs").setup(opts)
+    end,
+  },
+
+  {
+    "lewis6991/gitsigns.nvim",
+    event = { "BufReadPre", "BufNewFile" },
+    opts = {
+      current_line_blame = false,
+      signs = {
+        add = { text = "│" },
+        change = { text = "│" },
+        delete = { text = "_" },
+        topdelete = { text = "‾" },
+        changedelete = { text = "~" },
+      },
+    },
+  },
+
+  { "numToStr/Comment.nvim", event = "VeryLazy", opts = {} },
+  { "kylechui/nvim-surround", version = "*", event = "VeryLazy", opts = {} },
+  { "windwp/nvim-autopairs", event = "InsertEnter", opts = {} },
+  { "lukas-reineke/indent-blankline.nvim", main = "ibl", event = { "BufReadPost", "BufNewFile" }, opts = { indent = { char = "│" }, scope = { enabled = true } } },
+  { "folke/todo-comments.nvim", event = { "BufReadPost", "BufNewFile" }, dependencies = { "nvim-lua/plenary.nvim" }, opts = {} },
+  { "rcarriga/nvim-notify", event = "VeryLazy", opts = { stages = "fade_in_slide_out", render = "compact", timeout = 2500, background_colour = "#000000" }, init = function() vim.notify = require("notify") end },
+
+  {
+    "williamboman/mason.nvim",
+    cmd = "Mason",
+    opts = { ui = { border = "rounded" } },
+  },
+  {
+    "williamboman/mason-lspconfig.nvim",
+    dependencies = { "williamboman/mason.nvim", "neovim/nvim-lspconfig" },
+    opts = {
+      ensure_installed = { "lua_ls", "pyright", "ts_ls", "gopls", "rust_analyzer" },
+      automatic_enable = true,
+    },
+  },
+  {
+    "neovim/nvim-lspconfig",
+    event = { "BufReadPre", "BufNewFile" },
+    dependencies = { "saghen/blink.cmp" },
+    config = function()
+      vim.diagnostic.config({
+        severity_sort = true,
+        float = { border = "rounded", source = "if_many" },
+        underline = { severity = vim.diagnostic.severity.ERROR },
+        signs = true,
+        virtual_text = { spacing = 2, source = "if_many" },
+      })
+
+      vim.lsp.config("lua_ls", {
+        settings = {
+          Lua = {
+            diagnostics = { globals = { "vim" } },
+            workspace = { checkThirdParty = false },
+            telemetry = { enable = false },
+          },
+        },
+      })
+
+      vim.api.nvim_create_autocmd("LspAttach", {
+        group = vim.api.nvim_create_augroup("PsychovimLsp", { clear = true }),
+        callback = function(event)
+          local map = function(lhs, rhs, desc)
+            vim.keymap.set("n", lhs, rhs, { buffer = event.buf, desc = desc })
+          end
+          map("gd", vim.lsp.buf.definition, "Go to definition")
+          map("gD", vim.lsp.buf.declaration, "Go to declaration")
+          map("gr", vim.lsp.buf.references, "References")
+          map("K", vim.lsp.buf.hover, "Hover documentation")
+          map("<leader>rn", vim.lsp.buf.rename, "Rename symbol")
+          map("<leader>ca", vim.lsp.buf.code_action, "Code action")
         end,
-    }
+      })
+    end,
+  },
 
-    -- Buffer line (victim tabs)
-    use {
-        "akinsho/bufferline.nvim",
-        requires = "nvim-tree/nvim-web-devicons",
-        config = function()
-            require("bufferline").setup({
-                options = {
-                    mode = "buffers",
-                    separator_style = "slant",
-                    always_show_bufferline = true,
-                    show_buffer_close_icons = true,
-                    show_close_icon = false,
-                    color_icons = true,
-                    diagnostics = "nvim_lsp",
-                    diagnostics_indicator = function(count, level)
-                        local icon = level:match("error") and "💥" or "⚠️"
-                        return " " .. icon .. count
-                    end,
-                },
-            })
-        end,
-    }
+  {
+    "saghen/blink.cmp",
+    version = "1.*",
+    opts = {
+      keymap = { preset = "default" },
+      appearance = { nerd_font_variant = "mono" },
+      completion = { documentation = { auto_show = true, auto_show_delay_ms = 300 } },
+      sources = { default = { "lsp", "path", "snippets", "buffer" } },
+      fuzzy = { implementation = "prefer_rust_with_warning" },
+    },
+    opts_extend = { "sources.default" },
+  },
 
-    -- Indent guides (OCD lines)
-    use {
-        "lukas-reineke/indent-blankline.nvim",
-        config = function()
-            require("ibl").setup({
-                indent = {
-                    char = "│",
-                    tab_char = "│",
-                },
-                scope = {
-                    enabled = true,
-                    show_start = true,
-                    show_end = true,
-                },
-            })
-        end,
-    }
+  {
+    "stevearc/conform.nvim",
+    event = { "BufWritePre" },
+    cmd = { "ConformInfo" },
+    keys = {
+      { "<leader>cf", function() require("conform").format({ async = true, lsp_format = "fallback" }) end, desc = "Format file" },
+    },
+    opts = {
+      formatters_by_ft = {
+        lua = { "stylua" },
+        python = { "ruff_format" },
+        javascript = { "prettierd", "prettier", stop_after_first = true },
+        typescript = { "prettierd", "prettier", stop_after_first = true },
+        javascriptreact = { "prettierd", "prettier", stop_after_first = true },
+        typescriptreact = { "prettierd", "prettier", stop_after_first = true },
+        json = { "prettierd", "prettier", stop_after_first = true },
+        markdown = { "prettierd", "prettier", stop_after_first = true },
+      },
+      format_on_save = function(bufnr)
+        if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat then
+          return
+        end
+        return { timeout_ms = 1200, lsp_format = "fallback" }
+      end,
+    },
+  },
 
-    -- Dashboard (welcome to hell)
-    use {
-        "goolord/alpha-nvim",
-        config = function()
-            local alpha = require("alpha")
-            local dashboard = require("alpha.themes.dashboard")
+  {
+    "folke/snacks.nvim",
+    priority = 900,
+    lazy = false,
+    opts = {
+      dashboard = {
+        preset = {
+          header = [[
+██████╗ ███████╗██╗   ██╗ ██████╗██╗  ██╗ ██████╗ ██╗   ██╗██╗███╗   ███╗
+██╔══██╗██╔════╝╚██╗ ██╔╝██╔════╝██║  ██║██╔═══██╗██║   ██║██║████╗ ████║
+██████╔╝███████╗ ╚████╔╝ ██║     ███████║██║   ██║██║   ██║██║██╔████╔██║
+██╔═══╝ ╚════██║  ╚██╔╝  ██║     ██╔══██║██║   ██║╚██╗ ██╔╝██║██║╚██╔╝██║
+██║     ███████║   ██║   ╚██████╗██║  ██║╚██████╔╝ ╚████╔╝ ██║██║ ╚═╝ ██║
+╚═╝     ╚══════╝   ╚═╝    ╚═════╝╚═╝  ╚═╝ ╚═════╝   ╚═══╝  ╚═╝╚═╝     ╚═╝
 
-            -- Psychotic color animation (blood colors)
-            local blood_colors = {
-                "PychoRed1",
-                "PychoRed2",
-                "PychoRed3",
-                "PychoRed4",
-                "PychoRed5",
-            }
-
-            -- Define blood gradient colors
-            vim.api.nvim_set_hl(0, "PychoRed1", { fg = "#ff0000", bold = true })
-            vim.api.nvim_set_hl(0, "PychoRed2", { fg = "#cc0000", bold = true })
-            vim.api.nvim_set_hl(0, "PychoRed3", { fg = "#990000", bold = true })
-            vim.api.nvim_set_hl(0, "PychoRed4", { fg = "#660000", bold = true })
-            vim.api.nvim_set_hl(0, "PychoRed5", { fg = "#330000", bold = true })
-
-            dashboard.section.header.val = {
-                "                                                                      ",
-                "  ██████╗ ██╗   ██╗ ██████╗██╗  ██╗ ██████╗ ██╗   ██╗██╗███╗   ███╗",
-                "  ██╔══██╗╚██╗ ██╔╝██╔════╝██║  ██║██╔═══██╗██║   ██║██║████╗ ████║",
-                "  ██████╔╝ ╚████╔╝ ██║     ███████║██║   ██║██║   ██║██║██╔████╔██║",
-                "  ██╔═══╝   ╚██╔╝  ██║     ██╔══██║██║   ██║╚██╗ ██╔╝██║██║╚██╔╝██║",
-                "  ██║        ██║   ╚██████╗██║  ██║╚██████╔╝ ╚████╔╝ ██║██║ ╚═╝ ██║",
-                "  ╚═╝        ╚═╝    ╚═════╝╚═╝  ╚═╝ ╚═════╝   ╚═══╝  ╚═╝╚═╝     ╚═╝",
-                "                                                                      ",
-                "                🔪 I have to return some videotapes 🔪                ",
-                "                                                                      ",
-            }
-
-            -- Animate header with blood colors
-            local current_color = 1
-            local function animate_header()
-                dashboard.section.header.opts.hl = blood_colors[current_color]
-                current_color = current_color % #blood_colors + 1
-                
-                -- Refresh alpha if it's visible
-                if vim.bo.filetype == "alpha" then
-                    require("alpha").redraw()
-                    vim.defer_fn(animate_header, 300)
-                end
-            end
-
-            -- Start animation when alpha opens
-            vim.api.nvim_create_autocmd("FileType", {
-                pattern = "alpha",
-                callback = function()
-                    vim.defer_fn(animate_header, 300)
-                end,
-            })
-
-            dashboard.section.buttons.val = {
-                dashboard.button("f", "🔍  Find File", ":Telescope find_files<CR>"),
-                dashboard.button("n", "📄  New File", ":enew<CR>"),
-                dashboard.button("r", "🕐  Recent Files", ":Telescope oldfiles<CR>"),
-                dashboard.button("g", "📦  Clone Repository", ":lua vim.ui.input({prompt='Git URL: '}, function(url) if url then vim.cmd('!git clone ' .. url) end end)<CR>"),
-                dashboard.button("d", "💬  Discord", ":!xdg-open https://discord.gg/nvim &<CR>"),
-                dashboard.button("c", "⚙️   Config", ":e ~/.config/nvim/init.lua<CR>"),
-                dashboard.button("q", "🚪  Quit", ":qa<CR>"),
-            }
-
-            dashboard.section.footer.val = {
-                "",
-                "Welcome to PychoVim - Let's see Paul Allen's config...",
-            }
-
-            alpha.setup(dashboard.config)
-        end,
-    }
-
-    -- Notifications (intrusive thoughts)
-    use {
-        "rcarriga/nvim-notify",
-        config = function()
-            local notify = require("notify")
-            notify.setup({
-                background_colour = "#000000",
-                fps = 60,
-                icons = {
-                    DEBUG = "🐛",
-                    ERROR = "💥",
-                    INFO = "ℹ️",
-                    TRACE = "✎",
-                    WARN = "⚠️",
-                },
-                level = 2,
-                minimum_width = 50,
-                render = "compact",
-                stages = "fade_in_slide_out",
-                timeout = 3000,
-                top_down = true,
-            })
-            vim.notify = notify
-        end,
-    }
-
-    -- ═══════════════════════════════════════════════════════════
-    --  NAVIGATION (Stalking Tools)
-    -- ═══════════════════════════════════════════════════════════
-
-    use "nvim-lua/plenary.nvim"
-
-    -- Telescope (surveillance system)
-    use {
-        "nvim-telescope/telescope.nvim",
-        requires = { "nvim-lua/plenary.nvim" },
-        config = function()
-            require("telescope").setup({
-                defaults = {
-                    prompt_prefix = "🔍 ",
-                    selection_caret = "▶ ",
-                    path_display = { "truncate" },
-                    layout_config = {
-                        horizontal = {
-                            preview_width = 0.55,
-                        },
-                    },
-                },
-            })
-        end,
-    }
-
-    -- File tree (territory map)
-    use {
-        "nvim-tree/nvim-tree.lua",
-        requires = "nvim-tree/nvim-web-devicons",
-        config = function()
-            require("nvim-tree").setup({
-                view = {
-                    width = 35,
-                    side = "left",
-                },
-                renderer = {
-                    icons = {
-                        glyphs = {
-                            default = "📄",
-                            symlink = "🔗",
-                            folder = {
-                                default = "📁",
-                                open = "📂",
-                                empty = "📁",
-                                empty_open = "📂",
-                                symlink = "🔗",
-                            },
-                            git = {
-                                unstaged = "✗",
-                                staged = "✓",
-                                unmerged = "⚠",
-                                renamed = "➜",
-                                untracked = "★",
-                                deleted = "💀",
-                                ignored = "◌",
-                            },
-                        },
-                    },
-                },
-            })
-        end,
-    }
-
-    -- ═══════════════════════════════════════════════════════════
-    --  SYNTAX & HIGHLIGHTING (Forensic Analysis)
-    -- ═══════════════════════════════════════════════════════════
-
-    use {
-        "nvim-treesitter/nvim-treesitter",
-        run = ":TSUpdate",
-        config = function()
-            require("nvim-treesitter.configs").setup({
-                ensure_installed = {
-                    "lua", "vim", "vimdoc", "python", "javascript",
-                    "typescript", "rust", "go", "c", "cpp", "bash"
-                },
-                highlight = {
-                    enable = true,
-                    additional_vim_regex_highlighting = false,
-                },
-                indent = { enable = true },
-            })
-        end,
-    }
-
-    -- ═══════════════════════════════════════════════════════════
-    --  EDITING ENHANCEMENTS (Precision Tools)
-    -- ═══════════════════════════════════════════════════════════
-
-    -- Auto pairs (perfect symmetry)
-    use {
-        "windwp/nvim-autopairs",
-        config = function()
-            require("nvim-autopairs").setup({})
-        end,
-    }
-
-    -- Comments (inner monologue)
-    use {
-        "numToStr/Comment.nvim",
-        config = function()
-            require("Comment").setup()
-        end,
-    }
-
-    -- Surround (wrap victims)
-    use {
-        "kylechui/nvim-surround",
-        config = function()
-            require("nvim-surround").setup()
-        end,
-    }
-
-    -- ═══════════════════════════════════════════════════════════
-    --  GIT INTEGRATION (Track the evidence)
-    -- ═══════════════════════════════════════════════════════════
-
-    use {
-        "lewis6991/gitsigns.nvim",
-        config = function()
-            require("gitsigns").setup({
-                signs = {
-                    add = { text = "│" },
-                    change = { text = "│" },
-                    delete = { text = "_" },
-                    topdelete = { text = "‾" },
-                    changedelete = { text = "~" },
-                },
-            })
-        end,
-    }
-
-    -- ═══════════════════════════════════════════════════════════
-    --  EXTRAS (Psychopathic Details)
-    -- ═══════════════════════════════════════════════════════════
-
-    -- Which-key (memory aid for the unstable)
-    use {
-        "folke/which-key.nvim",
-        config = function()
-            require("which-key").setup({
-                window = {
-                    border = "double",
-                },
-            })
-        end,
-    }
-
-    -- Todo comments (obsessive notes)
-    use {
-        "folke/todo-comments.nvim",
-        requires = "nvim-lua/plenary.nvim",
-        config = function()
-            require("todo-comments").setup({
-                keywords = {
-                    KILL = { icon = "🔪", color = "error" },
-                    VICTIM = { icon = "💀", color = "warning" },
-                    HIDE = { icon = "🕵️", color = "hint" },
-                },
-            })
-        end,
-    }
-
-    -- Smooth scrolling (elegant movements)
-    use {
-        "karb94/neoscroll.nvim",
-        config = function()
-            require("neoscroll").setup()
-        end,
-    }
-
-    -- Color highlighter (blood detection)
-    use {
-        "norcalli/nvim-colorizer.lua",
-        config = function()
-            require("colorizer").setup()
-        end,
-    }
-end)
-
+                     I have to return some videotapes.
+]],
+          keys = {
+            { icon = " ", key = "f", desc = "Find File", action = ":Telescope find_files" },
+            { icon = " ", key = "r", desc = "Recent Files", action = ":Telescope oldfiles" },
+            { icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
+            { icon = "󰒲 ", key = "l", desc = "Lazy", action = ":Lazy" },
+            { icon = " ", key = "q", desc = "Quit", action = ":qa" },
+          },
+        },
+      },
+    },
+  },
+}
