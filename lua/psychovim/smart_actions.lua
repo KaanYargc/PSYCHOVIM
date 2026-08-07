@@ -22,16 +22,16 @@ end
 
 local function write_buffer(buf, after)
   if not is_writable_buffer(buf) then
-    notify("This buffer is not a writable file.", vim.log.levels.WARN)
+    notify("not a file buffer", vim.log.levels.WARN)
     return
   end
 
   local function finish(ok, err)
     if not ok then
-      notify("Save failed: " .. tostring(err), vim.log.levels.ERROR)
+      notify("save failed: " .. tostring(err), vim.log.levels.ERROR)
       return
     end
-    notify("Filed. Immaculate.")
+    notify("saved")
     if after then
       after()
     end
@@ -41,7 +41,6 @@ local function write_buffer(buf, after)
   if name == "" then
     vim.ui.input({ prompt = "Save as: " }, function(path)
       if not path or vim.trim(path) == "" then
-        notify("Save cancelled.", vim.log.levels.WARN)
         return
       end
       local ok, err = pcall(vim.api.nvim_buf_call, buf, function()
@@ -67,7 +66,7 @@ local function delete_buffer(force)
   local command = force and "bdelete!" or "bdelete"
   local ok, err = pcall(vim.cmd, command)
   if not ok then
-    notify("Could not close buffer: " .. tostring(err), vim.log.levels.ERROR)
+    notify("buffer close failed: " .. tostring(err), vim.log.levels.ERROR)
   end
 end
 
@@ -78,7 +77,7 @@ local function save_and_delete()
     if vim.api.nvim_buf_is_valid(buf) then
       local ok, err = pcall(vim.api.nvim_buf_delete, buf, { force = false })
       if not ok then
-        notify("Saved, but could not close buffer: " .. tostring(err), vim.log.levels.ERROR)
+        notify("saved; close failed: " .. tostring(err), vim.log.levels.ERROR)
       end
     end
   end)
@@ -172,7 +171,7 @@ function M.close_buffer()
 end
 
 function M.terminal_ctrl_s()
-  notify("Ctrl+S blocked in terminal mode to prevent flow-control freeze. Use it in an editor buffer to save.", vim.log.levels.WARN)
+  notify("Ctrl+S is terminal flow control here. blocked it. save from a file buffer.", vim.log.levels.WARN)
 end
 
 return M
