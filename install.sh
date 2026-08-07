@@ -9,6 +9,8 @@ BIN_DIR="${PSYCHOVIM_BIN_DIR:-$HOME/.local/bin}"
 NVIM_HOME="${PSYCHOVIM_NVIM_DIR:-$HOME/.local/share/psychovim/neovim}"
 NVIM_LINK="$BIN_DIR/nvim"
 PYCHO_BIN="$BIN_DIR/pycho"
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psychovim"
+SYNC_LOG="$CACHE_DIR/lazy-sync.log"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP=""
 NVIM_EXEC=""
@@ -183,6 +185,30 @@ EOF
   ensure_launcher_path
 }
 
+sync_plugins() {
+  local attempt
+  mkdir -p "$CACHE_DIR"
+  : > "$SYNC_LOG"
+
+  say "plugins: syncing"
+  for attempt in 1 2 3; do
+    if "$NVIM_EXEC" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then
+      say "plugins: ${green}ok${reset}"
+      return 0
+    fi
+
+    say "${yellow}plugins:${reset} sync failed ($attempt/3)"
+    if (( attempt < 3 )); then
+      sleep $(( attempt * 2 ))
+    fi
+  done
+
+  say "${yellow}plugins:${reset} install incomplete; network probably dropped"
+  say "log: ${bold}${SYNC_LOG}${reset}"
+  say "retry: ${bold}pycho --headless '+Lazy! sync' '+qa'${reset}"
+  return 0
+}
+
 say "${red}${bold}PSYCHOVIM${reset} // SETUP"
 say ""
 
@@ -208,10 +234,10 @@ if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TARGET"; then
 fi
 
 install_launcher
+sync_plugins
 
 say ""
 say "${green}${bold}done.${reset} run: ${bold}pycho${reset}"
-say "first launch: lazy.nvim will sync plugins"
 if [[ -n "$BACKUP" ]]; then
   say "old config: ${bold}${BACKUP}${reset}"
 fi
