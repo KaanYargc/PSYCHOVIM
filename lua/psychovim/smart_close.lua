@@ -34,7 +34,7 @@ local function save_and_quit()
 
   local ok, err = pcall(vim.cmd, "wall")
   if not ok then
-    vim.notify("SmartClose could not save all buffers: " .. tostring(err), vim.log.levels.ERROR)
+    vim.notify("SmartClose · save failed: " .. tostring(err), vim.log.levels.ERROR)
     return
   end
 
@@ -65,14 +65,14 @@ function M.open()
 
   local modified = modified_buffer_count()
   local status = modified == 0
-      and "Everything is already saved."
-      or string.format("Unsaved buffers: %d", modified)
+      and "Clean."
+      or string.format("Dirty buffers: %d", modified)
 
   local lines = {
     status,
     "",
-    "  1  Save all & quit",
-    "  2  Quit without saving",
+    "  1  Save all & exit",
+    "  2  Exit dirty",
     "  3  Cancel",
   }
 
