@@ -17,7 +17,7 @@ MERGERS AND ACQUISITIONS
 P S Y C H O V I M
 VICE PRESIDENT
 
-Appearance is everything. Precision is policy.
+THIS IS NOT AN EXIT.
 ]]
       opts.dashboard.preset.keys = {
         { icon = "  ", key = "f", desc = "Find File", action = ":Telescope find_files" },
