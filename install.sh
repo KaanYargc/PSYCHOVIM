@@ -8,7 +8,9 @@ DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 TARGET="${PSYCHOVIM_DIR:-$CONFIG_HOME/nvim}"
 BIN_DIR="${PSYCHOVIM_BIN_DIR:-$HOME/.local/bin}"
 NVIM_HOME="${PSYCHOVIM_NVIM_DIR:-$DATA_HOME/psychovim/neovim}"
+TS_HOME="${PSYCHOVIM_TREE_SITTER_DIR:-$DATA_HOME/psychovim/tree-sitter}"
 NVIM_LINK="$BIN_DIR/nvim"
+TS_LINK="$BIN_DIR/tree-sitter"
 PYCHO_BIN="$BIN_DIR/pycho"
 LAZY_ROOT="$DATA_HOME/nvim/lazy"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psychovim"
@@ -37,9 +39,78 @@ restore_backup() {
   fi
 }
 
+run_root() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    die "system packages are missing and sudo is unavailable"
+  fi
+}
+
+compiler_available() {
+  command -v cc >/dev/null 2>&1 || command -v gcc >/dev/null 2>&1 || command -v clang >/dev/null 2>&1
+}
+
+system_deps_ready() {
+  local cmd
+  for cmd in git curl tar gzip unzip rg make node npm; do
+    command -v "$cmd" >/dev/null 2>&1 || return 1
+  done
+  compiler_available
+}
+
+install_system_dependencies() {
+  if system_deps_ready; then
+    say "deps: ${green}ok${reset}"
+    return 0
+  fi
+
+  say "deps: installing git/curl/archive tools/ripgrep/compiler/node"
+
+  if command -v apt-get >/dev/null 2>&1; then
+    run_root apt-get update
+    run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
+      git curl tar gzip unzip ripgrep build-essential nodejs npm
+  elif command -v dnf >/dev/null 2>&1; then
+    run_root dnf install -y \
+      git curl tar gzip unzip ripgrep gcc gcc-c++ make nodejs npm
+  elif command -v pacman >/dev/null 2>&1; then
+    run_root pacman -Syu --needed --noconfirm \
+      git curl tar gzip unzip ripgrep base-devel nodejs npm
+  elif command -v zypper >/dev/null 2>&1; then
+    run_root zypper --non-interactive refresh
+    run_root zypper --non-interactive install \
+      git curl tar gzip unzip ripgrep gcc gcc-c++ make nodejs npm
+  elif command -v apk >/dev/null 2>&1; then
+    run_root apk add \
+      git curl tar gzip unzip ripgrep build-base nodejs npm
+  elif command -v brew >/dev/null 2>&1; then
+    local brew_pkgs=()
+    command -v git >/dev/null 2>&1 || brew_pkgs+=(git)
+    command -v curl >/dev/null 2>&1 || brew_pkgs+=(curl)
+    command -v rg >/dev/null 2>&1 || brew_pkgs+=(ripgrep)
+    command -v node >/dev/null 2>&1 || brew_pkgs+=(node)
+    if ! compiler_available; then brew_pkgs+=(llvm); fi
+    if (( ${#brew_pkgs[@]} > 0 )); then brew install "${brew_pkgs[@]}"; fi
+    if ! compiler_available && [[ -x "$(brew --prefix llvm)/bin/clang" ]]; then
+      mkdir -p "$BIN_DIR"
+      ln -sfn "$(brew --prefix llvm)/bin/clang" "$BIN_DIR/clang"
+      ln -sfn "$(brew --prefix llvm)/bin/clang" "$BIN_DIR/cc"
+      export PATH="$BIN_DIR:$PATH"
+    fi
+  else
+    die "missing dependencies and no supported package manager found (apt/dnf/pacman/zypper/apk/brew)"
+  fi
+
+  system_deps_ready || die "dependency install finished but required commands are still missing"
+  say "deps: ${green}ok${reset}"
+}
+
 nvim_is_supported() {
   local executable="$1" version_line major minor
-  version_line="$($executable --version 2>/dev/null | head -n 1 || true)"
+  version_line="$("$executable" --version 2>/dev/null | head -n 1 || true)"
   if [[ "$version_line" =~ v([0-9]+)\.([0-9]+) ]]; then
     major="${BASH_REMATCH[1]}"; minor="${BASH_REMATCH[2]}"
     (( major > 0 || (major == 0 && minor >= 12) ))
@@ -62,25 +133,69 @@ install_neovim() {
   url="https://github.com/neovim/neovim/releases/latest/download/${asset}.tar.gz"
   TMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t psychovim)"
   archive="$TMP_DIR/neovim.tar.gz"
-  say "nvim 0.12+ not found; pulling stable"
+
+  say "nvim: pulling official stable"
   curl -fL --retry 3 --connect-timeout 15 "$url" -o "$archive" || die "could not download Neovim"
   rm -rf "$NVIM_HOME"; mkdir -p "$NVIM_HOME"
   tar -xzf "$archive" --strip-components=1 -C "$NVIM_HOME" || die "could not extract Neovim"
   NVIM_EXEC="$NVIM_HOME/bin/nvim"
   [[ -x "$NVIM_EXEC" ]] || die "archive extracted without bin/nvim"
   nvim_is_supported "$NVIM_EXEC" || die "downloaded Neovim is older than 0.12"
+
   mkdir -p "$BIN_DIR"
   if [[ ! -e "$NVIM_LINK" || -L "$NVIM_LINK" ]]; then ln -sfn "$NVIM_EXEC" "$NVIM_LINK"; fi
-  say "nvim: $($NVIM_EXEC --version | head -n 1)"
+  say "nvim: $("$NVIM_EXEC" --version | head -n 1)"
 }
 
 resolve_neovim() {
-  if [[ -x "$NVIM_HOME/bin/nvim" ]] && nvim_is_supported "$NVIM_HOME/bin/nvim"; then NVIM_EXEC="$NVIM_HOME/bin/nvim"; return; fi
+  if [[ -x "$NVIM_HOME/bin/nvim" ]] && nvim_is_supported "$NVIM_HOME/bin/nvim"; then
+    NVIM_EXEC="$NVIM_HOME/bin/nvim"
+    say "nvim: $("$NVIM_EXEC" --version | head -n 1)"
+    return
+  fi
   if command -v nvim >/dev/null 2>&1; then
-    local existing="$(command -v nvim)"
-    if nvim_is_supported "$existing"; then NVIM_EXEC="$existing"; say "nvim: $($NVIM_EXEC --version | head -n 1)"; return; fi
+    local existing
+    existing="$(command -v nvim)"
+    if nvim_is_supported "$existing"; then
+      NVIM_EXEC="$existing"
+      say "nvim: $("$NVIM_EXEC" --version | head -n 1)"
+      return
+    fi
   fi
   install_neovim
+}
+
+detect_tree_sitter_asset() {
+  local os arch platform asset_arch
+  os="$(uname -s)"; arch="$(uname -m)"
+  case "$os" in Linux) platform="linux" ;; Darwin) platform="macos" ;; *) return 1 ;; esac
+  case "$arch" in x86_64|amd64) asset_arch="x64" ;; arm64|aarch64) asset_arch="arm64" ;; *) return 1 ;; esac
+  printf 'tree-sitter-cli-%s-%s.zip' "$platform" "$asset_arch"
+}
+
+install_tree_sitter() {
+  if command -v tree-sitter >/dev/null 2>&1; then
+    say "tree-sitter: $(tree-sitter --version 2>/dev/null | head -n 1)"
+    return 0
+  fi
+
+  local asset url archive
+  asset="$(detect_tree_sitter_asset)" || { say "${yellow}tree-sitter:${reset} unsupported platform; parser bootstrap may be limited"; return 0; }
+  url="https://github.com/tree-sitter/tree-sitter/releases/latest/download/${asset}"
+  TMP_DIR="${TMP_DIR:-$(mktemp -d 2>/dev/null || mktemp -d -t psychovim)}"
+  archive="$TMP_DIR/tree-sitter.zip"
+
+  say "tree-sitter: pulling official CLI"
+  curl -fL --retry 3 --connect-timeout 15 "$url" -o "$archive" || die "could not download tree-sitter CLI"
+  rm -rf "$TS_HOME"; mkdir -p "$TS_HOME/bin"
+  unzip -qo "$archive" -d "$TS_HOME/bin" || die "could not extract tree-sitter CLI"
+  [[ -x "$TS_HOME/bin/tree-sitter" ]] || chmod 755 "$TS_HOME/bin/tree-sitter" 2>/dev/null || true
+  [[ -x "$TS_HOME/bin/tree-sitter" ]] || die "tree-sitter archive extracted without executable"
+
+  mkdir -p "$BIN_DIR"
+  if [[ ! -e "$TS_LINK" || -L "$TS_LINK" ]]; then ln -sfn "$TS_HOME/bin/tree-sitter" "$TS_LINK"; fi
+  export PATH="$BIN_DIR:$PATH"
+  say "tree-sitter: $("$TS_HOME/bin/tree-sitter" --version | head -n 1)"
 }
 
 ensure_launcher_path() {
@@ -143,16 +258,18 @@ sync_parsers() {
 }
 
 say "${red}${bold}PSYCHOVIM${reset} // SETUP"
-command -v git >/dev/null 2>&1 || die "git is required"
-command -v curl >/dev/null 2>&1 || die "curl is required"
-command -v tar >/dev/null 2>&1 || die "tar is required"
-resolve_neovim
 
 if $LAUNCHER_ONLY; then
+  resolve_neovim
   install_launcher
   say "${green}launcher updated.${reset} try: pycho help"
   exit 0
 fi
+
+install_system_dependencies
+resolve_neovim
+install_tree_sitter
+export PATH="$BIN_DIR:$PATH"
 
 if [[ -e "$TARGET" || -L "$TARGET" ]]; then
   BACKUP="${TARGET}.backup-${STAMP}"
