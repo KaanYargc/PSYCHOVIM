@@ -1,3 +1,10 @@
+local settings = require("psychovim.settings")
+local enabled = function(key)
+  return function()
+    return settings.get(key) ~= false
+  end
+end
+
 return {
   {
     "catppuccin/nvim",
@@ -25,13 +32,6 @@ return {
             maroon = "#7f0d1d",
           },
         },
-        custom_highlights = function()
-          return {
-            CursorLine = { bg = "#151518" },
-            LineNr = { fg = "#45454f" },
-            CursorLineNr = { fg = "#b11226", style = { "bold" } },
-          }
-        end,
       })
       vim.cmd.colorscheme("catppuccin")
     end,
@@ -41,6 +41,7 @@ return {
 
   {
     "nvim-lualine/lualine.nvim",
+    cond = enabled("statusline"),
     event = "VeryLazy",
     dependencies = { "nvim-tree/nvim-web-devicons" },
     opts = {
@@ -51,7 +52,7 @@ return {
         component_separators = { left = "│", right = "│" },
       },
       sections = {
-        lualine_a = { { "mode", fmt = function(value) return "🔪 " .. value end } },
+        lualine_a = { { "mode" } },
         lualine_b = { "branch", "diff" },
         lualine_c = { { "filename", path = 1 } },
         lualine_x = { "diagnostics", "filetype" },
@@ -63,6 +64,7 @@ return {
 
   {
     "akinsho/bufferline.nvim",
+    cond = enabled("bufferline"),
     version = "*",
     event = "VeryLazy",
     dependencies = { "nvim-tree/nvim-web-devicons" },
@@ -78,19 +80,22 @@ return {
 
   {
     "folke/which-key.nvim",
+    cond = enabled("which_key"),
     event = "VeryLazy",
     opts = { preset = "modern", delay = 300 },
   },
 
   {
     "nvim-telescope/telescope.nvim",
+    cond = enabled("telescope"),
     cmd = "Telescope",
     dependencies = { "nvim-lua/plenary.nvim" },
     opts = {
       defaults = {
-        prompt_prefix = "🔍 ",
-        selection_caret = "▶ ",
+        prompt_prefix = "> ",
+        selection_caret = "> ",
         path_display = { "smart" },
+        border = true,
         layout_config = { horizontal = { preview_width = 0.55 } },
       },
     },
@@ -105,6 +110,7 @@ return {
 
   {
     "nvim-tree/nvim-tree.lua",
+    cond = enabled("file_tree"),
     cmd = { "NvimTreeToggle", "NvimTreeFocus" },
     dependencies = { "nvim-tree/nvim-web-devicons" },
     opts = {
@@ -127,29 +133,14 @@ return {
 
   {
     "nvim-treesitter/nvim-treesitter",
+    cond = enabled("treesitter"),
     lazy = false,
     build = ":TSUpdate",
-    config = function()
-      local treesitter = require("nvim-treesitter")
-      local languages = {
-        "bash", "c", "cpp", "go", "javascript", "json", "lua", "markdown",
-        "python", "rust", "toml", "tsx", "typescript", "vim", "vimdoc", "yaml",
-      }
-
-      treesitter.setup({})
-      treesitter.install(languages)
-
-      vim.api.nvim_create_autocmd("FileType", {
-        pattern = languages,
-        callback = function()
-          pcall(vim.treesitter.start)
-        end,
-      })
-    end,
   },
 
   {
     "lewis6991/gitsigns.nvim",
+    cond = enabled("gitsigns"),
     event = { "BufReadPre", "BufNewFile" },
     opts = {
       current_line_blame = false,
@@ -164,12 +155,25 @@ return {
   },
 
   { "numToStr/Comment.nvim", event = "VeryLazy", opts = {} },
-  { "kylechui/nvim-surround", version = "*", event = "VeryLazy", opts = {} },
-  { "windwp/nvim-autopairs", event = "InsertEnter", opts = {} },
-  { "lukas-reineke/indent-blankline.nvim", main = "ibl", event = { "BufReadPost", "BufNewFile" }, opts = { indent = { char = "│" }, scope = { enabled = true } } },
-  { "folke/todo-comments.nvim", event = { "BufReadPost", "BufNewFile" }, dependencies = { "nvim-lua/plenary.nvim" }, opts = {} },
+  { "kylechui/nvim-surround", cond = enabled("surround"), version = "*", event = "VeryLazy", opts = {} },
+  { "windwp/nvim-autopairs", cond = enabled("autopairs"), event = "InsertEnter", opts = {} },
+  {
+    "lukas-reineke/indent-blankline.nvim",
+    cond = enabled("indent_guides"),
+    main = "ibl",
+    event = { "BufReadPost", "BufNewFile" },
+    opts = { indent = { char = "│" }, scope = { enabled = true } },
+  },
+  {
+    "folke/todo-comments.nvim",
+    cond = enabled("todo_comments"),
+    event = { "BufReadPost", "BufNewFile" },
+    dependencies = { "nvim-lua/plenary.nvim" },
+    opts = {},
+  },
   {
     "rcarriga/nvim-notify",
+    cond = enabled("notifications"),
     lazy = false,
     opts = {
       stages = "fade_in_slide_out",
@@ -185,13 +189,19 @@ return {
   },
 
   {
-    "williamboman/mason.nvim",
-    cmd = "Mason",
-    opts = { ui = { border = "rounded" } },
+    "mason-org/mason.nvim",
+    cond = enabled("lsp"),
+    opts = function()
+      return { ui = { border = settings.get("popup_border") or "rounded" } }
+    end,
   },
   {
-    "williamboman/mason-lspconfig.nvim",
-    dependencies = { "williamboman/mason.nvim", "neovim/nvim-lspconfig" },
+    "mason-org/mason-lspconfig.nvim",
+    cond = enabled("lsp"),
+    dependencies = {
+      { "mason-org/mason.nvim" },
+      "neovim/nvim-lspconfig",
+    },
     opts = {
       ensure_installed = { "lua_ls", "pyright", "ts_ls", "gopls", "rust_analyzer" },
       automatic_enable = true,
@@ -199,15 +209,15 @@ return {
   },
   {
     "neovim/nvim-lspconfig",
+    cond = enabled("lsp"),
     event = { "BufReadPre", "BufNewFile" },
-    dependencies = { "saghen/blink.cmp" },
     config = function()
       vim.diagnostic.config({
         severity_sort = true,
-        float = { border = "rounded", source = "if_many" },
+        float = { border = settings.get("popup_border") or "rounded", source = "if_many" },
         underline = { severity = vim.diagnostic.severity.ERROR },
         signs = true,
-        virtual_text = { spacing = 2, source = "if_many" },
+        virtual_text = settings.get("diagnostic_virtual_text") and { spacing = 2, source = "if_many" } or false,
       })
 
       vim.lsp.config("lua_ls", {
@@ -239,6 +249,7 @@ return {
 
   {
     "saghen/blink.cmp",
+    cond = enabled("completion"),
     version = "1.*",
     opts = {
       keymap = { preset = "default" },
@@ -252,10 +263,15 @@ return {
 
   {
     "stevearc/conform.nvim",
+    cond = enabled("formatting"),
     event = { "BufWritePre" },
     cmd = { "ConformInfo" },
     keys = {
-      { "<leader>cf", function() require("conform").format({ async = true, lsp_format = "fallback" }) end, desc = "Format file" },
+      {
+        "<leader>cf",
+        function() require("conform").format({ async = true, lsp_format = "fallback" }) end,
+        desc = "Format file",
+      },
     },
     opts = {
       formatters_by_ft = {
@@ -269,9 +285,7 @@ return {
         markdown = { "prettierd", "prettier", stop_after_first = true },
       },
       format_on_save = function(bufnr)
-        if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat then
-          return
-        end
+        if vim.g.disable_autoformat or vim.b[bufnr].disable_autoformat then return end
         return { timeout_ms = 1200, lsp_format = "fallback" }
       end,
     },
@@ -285,21 +299,21 @@ return {
       dashboard = {
         preset = {
           header = [[
-██████╗ ███████╗██╗   ██╗ ██████╗██╗  ██╗ ██████╗ ██╗   ██╗██╗███╗   ███╗
-██╔══██╗██╔════╝╚██╗ ██╔╝██╔════╝██║  ██║██╔═══██╗██║   ██║██║████╗ ████║
-██████╔╝███████╗ ╚████╔╝ ██║     ███████║██║   ██║██║   ██║██║██╔████╔██║
-██╔═══╝ ╚════██║  ╚██╔╝  ██║     ██╔══██║██║   ██║╚██╗ ██╔╝██║██║╚██╔╝██║
-██║     ███████║   ██║   ╚██████╗██║  ██║╚██████╔╝ ╚████╔╝ ██║██║ ╚═╝ ██║
-╚═╝     ╚══════╝   ╚═╝    ╚═════╝╚═╝  ╚═╝ ╚═════╝   ╚═══╝  ╚═╝╚═╝     ╚═╝
+PIERCE & PIERCE
+MERGERS AND ACQUISITIONS
 
-                     I have to return some videotapes.
+P S Y C H O V I M
+VICE PRESIDENT
+
+THIS IS NOT AN EXIT.
 ]],
           keys = {
-            { icon = " ", key = "f", desc = "Find File", action = ":Telescope find_files" },
-            { icon = " ", key = "r", desc = "Recent Files", action = ":Telescope oldfiles" },
-            { icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
-            { icon = "󰒲 ", key = "l", desc = "Lazy", action = ":Lazy" },
-            { icon = " ", key = "q", desc = "Quit", action = ":qa" },
+            { icon = "  ", key = "f", desc = "Find File", action = ":Telescope find_files" },
+            { icon = "  ", key = "r", desc = "Recent Files", action = ":Telescope oldfiles" },
+            { icon = "  ", key = "n", desc = "New File", action = ":ene | startinsert" },
+            { icon = "  ", key = "s", desc = "Settings", action = ":PychoSettings" },
+            { icon = "  ", key = "l", desc = "Plugin Inventory", action = ":Lazy" },
+            { icon = "  ", key = "q", desc = "PychoClose", action = ":lua require('psychovim.pycho_close').open()" },
           },
         },
       },
