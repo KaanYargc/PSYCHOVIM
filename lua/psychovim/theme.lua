@@ -53,31 +53,27 @@ function M.apply(mode)
   set("DiagnosticError", { fg = p.red })
   set("DiagnosticWarn", { fg = mode == "sanity" and "#b99766" or "#c4865c" })
 
-  vim.api.nvim_set_hl(0, "PsychovimCardTitle", { fg = p.accent, bold = true })
-  vim.api.nvim_set_hl(0, "PsychovimCardAccent", { fg = p.red, bold = true })
-  vim.api.nvim_set_hl(0, "PsychovimMuted", { fg = p.muted, italic = true })
+  set("PsychovimCardTitle", { fg = p.accent, bold = true })
+  set("PsychovimCardAccent", { fg = p.red, bold = true })
+  set("PsychovimMuted", { fg = p.muted, italic = true })
 end
 
 function M.toggle()
   local next_mode = vim.g.psychovim_mask == "after_hours" and "sanity" or "after_hours"
   M.apply(next_mode)
-  if next_mode == "sanity" then
-    vim.notify("Mask of Sanity restored.")
-  else
-    vim.notify("After Hours. The surface is beginning to slip.")
-  end
+  vim.notify(next_mode == "sanity" and "Mask on." or "After hours.")
 end
 
 function M.setup()
   vim.g.psychovim_mask = vim.g.psychovim_mask or "sanity"
   vim.api.nvim_create_user_command("Mask", function()
     M.apply("sanity")
-    vim.notify("Mask of Sanity restored.")
-  end, { desc = "Restore PSYCHOVIM's restrained corporate palette" })
+    vim.notify("Mask on.")
+  end, { desc = "Restore the restrained PSYCHOVIM palette" })
   vim.api.nvim_create_user_command("AfterHours", function()
     M.apply("after_hours")
-    vim.notify("After Hours enabled.")
-  end, { desc = "Reveal PSYCHOVIM's darker palette" })
+    vim.notify("After hours.")
+  end, { desc = "Use the red-heavy PSYCHOVIM palette" })
 
   local group = vim.api.nvim_create_augroup("PsychovimTheme", { clear = true })
   vim.api.nvim_create_autocmd("ColorScheme", {
