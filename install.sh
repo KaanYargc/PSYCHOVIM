@@ -6,6 +6,7 @@ BRANCH="${PSYCHOVIM_BRANCH:-main}"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 TARGET="${PSYCHOVIM_DIR:-$CONFIG_HOME/nvim}"
 STAMP="$(date +%Y%m%d-%H%M%S)"
+BACKUP=""
 
 bold='\033[1m'
 red='\033[31m'
@@ -15,6 +16,14 @@ reset='\033[0m'
 
 say() { printf '%b\n' "$*"; }
 die() { say "${red}error:${reset} $*" >&2; exit 1; }
+
+restore_backup() {
+  if [[ -n "$BACKUP" && -e "$BACKUP" ]]; then
+    rm -rf "$TARGET"
+    mv "$BACKUP" "$TARGET"
+    say "${yellow}Previous Neovim config restored.${reset}"
+  fi
+}
 
 say "${red}${bold}PSYCHOVIM${reset} — installation protocol"
 say ""
@@ -45,12 +54,16 @@ mkdir -p "$(dirname "$TARGET")"
 
 say "Cloning PSYCHOVIM (${BRANCH}) into ${bold}${TARGET}${reset}..."
 if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TARGET"; then
-  die "clone failed. If a backup was created, it has been left untouched."
+  restore_backup
+  die "clone failed. No existing configuration was lost."
 fi
 
 say ""
 say "${green}${bold}Installation complete.${reset}"
 say "Run: ${bold}nvim${reset}"
 say "On first launch, lazy.nvim will bootstrap the plugin set."
+if [[ -n "$BACKUP" ]]; then
+  say "Previous config backup: ${bold}${BACKUP}${reset}"
+fi
 say ""
 say "Ctrl+C / Ctrl+D → SmartClose"
