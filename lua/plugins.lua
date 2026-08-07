@@ -127,15 +127,24 @@ return {
 
   {
     "nvim-treesitter/nvim-treesitter",
+    lazy = false,
     build = ":TSUpdate",
-    event = { "BufReadPost", "BufNewFile" },
-    opts = {
-      ensure_installed = { "bash", "c", "cpp", "go", "javascript", "json", "lua", "markdown", "python", "rust", "toml", "tsx", "typescript", "vim", "vimdoc", "yaml" },
-      highlight = { enable = true },
-      indent = { enable = true },
-    },
-    config = function(_, opts)
-      require("nvim-treesitter.configs").setup(opts)
+    config = function()
+      local treesitter = require("nvim-treesitter")
+      local languages = {
+        "bash", "c", "cpp", "go", "javascript", "json", "lua", "markdown",
+        "python", "rust", "toml", "tsx", "typescript", "vim", "vimdoc", "yaml",
+      }
+
+      treesitter.setup({})
+      treesitter.install(languages)
+
+      vim.api.nvim_create_autocmd("FileType", {
+        pattern = languages,
+        callback = function()
+          pcall(vim.treesitter.start)
+        end,
+      })
     end,
   },
 
@@ -159,7 +168,21 @@ return {
   { "windwp/nvim-autopairs", event = "InsertEnter", opts = {} },
   { "lukas-reineke/indent-blankline.nvim", main = "ibl", event = { "BufReadPost", "BufNewFile" }, opts = { indent = { char = "│" }, scope = { enabled = true } } },
   { "folke/todo-comments.nvim", event = { "BufReadPost", "BufNewFile" }, dependencies = { "nvim-lua/plenary.nvim" }, opts = {} },
-  { "rcarriga/nvim-notify", event = "VeryLazy", opts = { stages = "fade_in_slide_out", render = "compact", timeout = 2500, background_colour = "#000000" }, init = function() vim.notify = require("notify") end },
+  {
+    "rcarriga/nvim-notify",
+    lazy = false,
+    opts = {
+      stages = "fade_in_slide_out",
+      render = "compact",
+      timeout = 2500,
+      background_colour = "#000000",
+    },
+    config = function(_, opts)
+      local notify = require("notify")
+      notify.setup(opts)
+      vim.notify = notify
+    end,
+  },
 
   {
     "williamboman/mason.nvim",
