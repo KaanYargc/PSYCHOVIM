@@ -1,50 +1,72 @@
 local map = vim.keymap.set
-local smart = require("psychovim.smart_actions")
+local actions = require("psychovim.smart_actions")
+
+local function feed_native(keys)
+  local term = vim.api.nvim_replace_termcodes(keys, true, false, true)
+  vim.api.nvim_feedkeys(term, "n", false)
+end
 
 map("i", "jk", "<Esc>", { desc = "Exit insert mode" })
 map("i", "kj", "<Esc>", { desc = "Exit insert mode" })
 
--- SmartClose is PSYCHOVIM's signature escape hatch.
--- Ctrl+C / Ctrl+D are intentionally easy to remember, but ask before leaving.
-local function smart_close()
-  local mode = vim.api.nvim_get_mode().mode
+local function pycho_close_or_native(key)
+  if vim.g.pycho_close == false then
+    feed_native(key)
+    return
+  end
 
+  local mode = vim.api.nvim_get_mode().mode
   if mode:sub(1, 1) == "i" then
     vim.cmd("stopinsert")
   elseif mode:sub(1, 1) == "t" then
-    local escape = vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true)
-    vim.api.nvim_feedkeys(escape, "n", false)
+    feed_native("<C-\\><C-n>")
   end
-
   require("psychovim.smart_close").open()
 end
 
 for _, mode in ipairs({ "n", "i", "x", "t" }) do
-  map(mode, "<C-c>", smart_close, { desc = "SmartClose" })
-  map(mode, "<C-d>", smart_close, { desc = "SmartClose" })
+  map(mode, "<C-c>", function() pycho_close_or_native("<C-c>") end, { desc = "PychoClose" })
+  map(mode, "<C-d>", function() pycho_close_or_native("<C-d>") end, { desc = "PychoClose" })
 end
 
--- Ctrl+S should save, not appear broken or freeze a terminal via flow control.
-map("n", "<C-s>", smart.save, { desc = "SmartSave" })
-map("x", "<C-s>", "<Esc><cmd>lua require('psychovim.smart_actions').save()<cr>", { desc = "SmartSave" })
-map("i", "<C-s>", "<C-o><cmd>lua require('psychovim.smart_actions').save()<cr>", { desc = "SmartSave" })
-map("t", "<C-s>", smart.terminal_ctrl_s, { desc = "Prevent terminal flow-control freeze" })
+local function pycho_save_or_native()
+  if vim.g.pycho_save == false then feed_native("<C-s>"); return end
+  actions.save()
+end
+map("n", "<C-s>", pycho_save_or_native, { desc = "PychoSave" })
+map("x", "<C-s>", function()
+  if vim.g.pycho_save == false then feed_native("<C-s>") else feed_native("<Esc>"); vim.schedule(actions.save) end
+end, { desc = "PychoSave" })
+map("i", "<C-s>", function()
+  if vim.g.pycho_save == false then feed_native("<C-s>") else vim.cmd("stopinsert"); actions.save(); vim.cmd("startinsert") end
+end, { desc = "PychoSave" })
+map("t", "<C-s>", function()
+  if vim.g.pycho_save == false then feed_native("<C-s>") else actions.terminal_ctrl_s() end
+end, { desc = "PychoSave terminal guard" })
 
--- Newcomers expect Ctrl+Z to undo. Native Neovim suspends the whole editor instead.
-map("n", "<C-z>", "<cmd>undo<cr>", { desc = "Undo" })
-map("x", "<C-z>", "<Esc><cmd>undo<cr>", { desc = "Undo" })
-map("i", "<C-z>", "<C-o>u", { desc = "Undo" })
+local function ctrl_z(mode)
+  if vim.g.pycho_ctrl_z_undo == false then feed_native("<C-z>"); return end
+  if mode == "i" then vim.cmd("undo"); vim.cmd("startinsert") else vim.cmd("undo") end
+end
+map("n", "<C-z>", function() ctrl_z("n") end, { desc = "PychoUndo" })
+map("x", "<C-z>", function() feed_native("<Esc>"); vim.schedule(function() ctrl_z("n") end) end, { desc = "PychoUndo" })
+map("i", "<C-z>", function() vim.cmd("stopinsert"); ctrl_z("i") end, { desc = "PychoUndo" })
 map("n", "<C-S-z>", "<C-r>", { desc = "Redo" })
 map("i", "<C-S-z>", "<C-o><C-r>", { desc = "Redo" })
 
--- Familiar editor shortcuts without stealing insert-mode completion keys.
-map("n", "<C-p>", "<cmd>Telescope find_files<cr>", { desc = "Find files" })
-map("n", "<C-f>", "<cmd>Telescope current_buffer_fuzzy_find<cr>", { desc = "Find in current file" })
-map("n", "<C-a>", "ggVG", { desc = "Select all" })
+map("n", "<C-p>", function()
+  if vim.g.pycho_familiar_shortcuts == false then feed_native("<C-p>") else vim.cmd("Telescope find_files") end
+end, { desc = "PychoFind files" })
+map("n", "<C-f>", function()
+  if vim.g.pycho_familiar_shortcuts == false then feed_native("<C-f>") else vim.cmd("Telescope current_buffer_fuzzy_find") end
+end, { desc = "PychoFind in file" })
+map("n", "<C-a>", function()
+  if vim.g.pycho_familiar_shortcuts == false then feed_native("<C-a>") else vim.cmd("normal! ggVG") end
+end, { desc = "PychoSelect all" })
 
-map("n", "<leader>w", smart.save, { desc = "SmartSave" })
+map("n", "<leader>w", actions.save, { desc = "PychoSave" })
 map("n", "<leader>q", "<cmd>quit<cr>", { desc = "Quit window" })
-map("n", "<leader>Q", smart_close, { desc = "SmartClose" })
+map("n", "<leader>Q", function() require("psychovim.smart_close").open() end, { desc = "PychoClose" })
 map("n", "<leader>h", "<cmd>nohlsearch<cr>", { desc = "Clear search highlight" })
 
 map("n", "<C-h>", "<C-w>h", { desc = "Window left" })
@@ -57,10 +79,11 @@ map("n", "<leader>sx", "<cmd>close<cr>", { desc = "Close split" })
 
 map("n", "<Tab>", "<cmd>bnext<cr>", { desc = "Next buffer" })
 map("n", "<S-Tab>", "<cmd>bprevious<cr>", { desc = "Previous buffer" })
-map("n", "<leader>bd", smart.close_buffer, { desc = "SmartBufferClose" })
+map("n", "<leader>bd", actions.close_buffer, { desc = "PychoBufferClose" })
 
--- Visual paste keeps the yank register intact, so one copy can replace many selections.
-map("v", "p", '"_dP', { desc = "Paste without replacing register" })
+map("v", "p", function()
+  if vim.g.pycho_safe_visual_paste == false then feed_native("p") else feed_native('"_dP') end
+end, { desc = "PychoPaste" })
 map("v", "<", "<gv", { desc = "Indent left" })
 map("v", ">", ">gv", { desc = "Indent right" })
 map("n", "<A-j>", "<cmd>move .+1<cr>==", { desc = "Move line down" })
