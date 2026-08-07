@@ -11,6 +11,7 @@ CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psychovim"
 SETTINGS_FILE="$STATE_HOME/nvim/psychovim/settings.json"
 LAZY_ROOT="$DATA_HOME/nvim/lazy"
 SYNC_LOG="$CACHE_DIR/lazy-sync.log"
+TOOL_LOG="$CACHE_DIR/mason-tools.log"
 PARSER_LOG="$CACHE_DIR/parser-sync.log"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
@@ -25,6 +26,10 @@ setting_on() {
     if grep -Eq '"'"$key"'"[[:space:]]*:[[:space:]]*true' "$SETTINGS_FILE"; then return 0; fi
   fi
   [[ "$default" == "true" ]]
+}
+
+tooling_enabled() {
+  setting_on lsp true || setting_on formatting true
 }
 
 resolve_nvim() {
@@ -72,6 +77,26 @@ sync_plugins() {
   done
   say "plugins      ${yellow}incomplete${reset}"
   say "log          $SYNC_LOG"
+  return 1
+}
+
+sync_tools() {
+  mkdir -p "$CACHE_DIR"
+  : > "$TOOL_LOG"
+
+  if ! tooling_enabled; then
+    say "tools        off in settings"
+    return 0
+  fi
+
+  say "tools        syncing"
+  if PSYCHOVIM_MAINTENANCE=1 "$NVIM_BIN" --headless "+MasonToolsUpdateSync" "+qa" >>"$TOOL_LOG" 2>&1; then
+    say "tools        ${green}ok${reset}"
+    return 0
+  fi
+
+  say "tools        ${yellow}incomplete${reset}"
+  say "log          $TOOL_LOG"
   return 1
 }
 
@@ -176,7 +201,10 @@ startup_update() {
   resolve_nvim
   say "${red}${bold}PSYCHOVIM${reset} // CHECK"
   $do_config && update_config_soft || true
-  $do_plugins && sync_plugins 1 || true
+  if $do_plugins; then
+    sync_plugins 1 || true
+    sync_tools || true
+  fi
   $do_parsers && sync_parsers || true
   say ""
 }
@@ -190,6 +218,7 @@ update_psychovim() {
 
   local rc=0
   sync_plugins 3 || rc=1
+  sync_tools || rc=1
   sync_parsers || rc=1
   say ""
   if (( rc == 0 )); then
@@ -212,14 +241,14 @@ show_status() {
     say "config       missing"
   fi
   setting_on auto_update_config true && say "auto config  on" || say "auto config  off"
-  setting_on auto_update_plugins true && say "auto plugins on" || say "auto plugins off"
+  setting_on auto_update_plugins true && say "auto tooling on" || say "auto tooling off"
   setting_on auto_update_parsers true && say "auto parsers on" || say "auto parsers off"
 }
 
 show_help() {
   cat <<'EOF'
 pycho [file|dir]
-pycho update       update config, plugins and parsers now
+pycho update       update config, plugins, tools and parsers now
 pycho settings     open PychoSettings
 pycho status       show install and update state
 pycho doctor       open Morning Routine
