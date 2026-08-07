@@ -35,6 +35,20 @@ vim.api.nvim_create_autocmd("BufReadPost", {
   end,
 })
 
+vim.api.nvim_create_autocmd("TermOpen", {
+  group = group,
+  callback = function()
+    vim.wo.number = settings.get("terminal_numbers") == true
+    vim.wo.relativenumber = false
+    vim.wo.signcolumn = settings.get("terminal_signcolumn") == true and "yes" or "no"
+    if settings.get("terminal_start_insert") then
+      vim.schedule(function()
+        if vim.bo.buftype == "terminal" then vim.cmd("startinsert") end
+      end)
+    end
+  end,
+})
+
 vim.api.nvim_create_autocmd("FileType", {
   group = group,
   pattern = { "help", "qf", "man", "checkhealth", "lspinfo" },
