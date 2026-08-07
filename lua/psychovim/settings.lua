@@ -75,6 +75,20 @@ local function apply_item(key)
   end
 end
 
+function M.set(key, value)
+  if defaults[key] == nil then return false end
+  config[key] = value
+  apply_item(key)
+  save()
+  return true
+end
+
+function M.toggle_mask()
+  local next_mode = config.mask == "after_hours" and "sanity" or "after_hours"
+  M.set("mask", next_mode)
+  vim.notify(next_mode == "sanity" and "Mask on." or "After hours.")
+end
+
 local function close()
   if state.win and vim.api.nvim_win_is_valid(state.win) then vim.api.nvim_win_close(state.win, true) end
   state.win, state.buf = nil, nil
@@ -142,15 +156,13 @@ end
 local function toggle_current()
   local item = rows[selectable[state.row]]
   if not item then return end
-
+  local next_value
   if item.key == "mask" then
-    config.mask = config.mask == "after_hours" and "sanity" or "after_hours"
+    next_value = config.mask == "after_hours" and "sanity" or "after_hours"
   else
-    config[item.key] = not config[item.key]
+    next_value = not config[item.key]
   end
-
-  apply_item(item.key)
-  save()
+  M.set(item.key, next_value)
   render()
 end
 
