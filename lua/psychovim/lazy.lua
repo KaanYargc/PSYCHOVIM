@@ -21,11 +21,12 @@ end
 
 vim.opt.rtp:prepend(lazypath)
 
+local settings = require("psychovim.settings")
+
 require("lazy").setup({
   { import = "plugins" },
   { import = "psychovim.plugin_overrides" },
 }, {
-  -- Unlimited parallel Git jobs are fast on a datacenter and stupid on flaky Wi-Fi.
   concurrency = 2,
   git = {
     timeout = 300,
@@ -35,8 +36,7 @@ require("lazy").setup({
       duration = 3000,
     },
   },
-  -- Don't turn every startup into a GitHub update sweep. :Lazy check exists.
-  checker = { enabled = false, notify = false },
+  checker = { enabled = settings.get("plugin_update_check") == true, notify = false },
   change_detection = { notify = false },
   install = { colorscheme = { "catppuccin" } },
   headless = {
