@@ -63,7 +63,7 @@ There are three policy switches in Pycho Settings: config updates, plugin/toolch
 PSYCHOVIM_NO_AUTOUPDATE=1 pycho
 ```
 
-Lazy also runs its own background update checker on interactive Neovim launches. Maintenance/headless runs disable that checker so it cannot race the explicit updater. Its lockfile lives in Neovim state rather than the Git checkout, so plugin updates do not make the config repo dirty.
+Lazy also keeps its own background checker enabled on interactive launches. The explicit pre-launch maintenance pass is the thing that actually syncs updates every time; maintenance/headless runs suppress the background checker so the two do not race. Its lockfile lives in Neovim state rather than the Git checkout, so plugin updates do not make the config repo dirty.
 
 ### Old install?
 
