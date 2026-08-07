@@ -36,7 +36,12 @@ require("lazy").setup({
       duration = 3000,
     },
   },
-  checker = { enabled = settings.get("plugin_update_check") == true, notify = false },
+  checker = {
+    enabled = settings.get("plugin_update_check") == true,
+    notify = false,
+    frequency = 0,
+    concurrency = 1,
+  },
   change_detection = { notify = false },
   install = { colorscheme = { "catppuccin" } },
   headless = {
@@ -46,7 +51,7 @@ require("lazy").setup({
     colors = false,
   },
   ui = {
-    border = "rounded",
+    border = settings.get("popup_border") or "rounded",
     icons = {
       cmd = "⌘",
       config = "⚙",
