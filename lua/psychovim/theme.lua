@@ -59,19 +59,17 @@ function M.apply(mode)
 end
 
 function M.toggle()
-  local next_mode = vim.g.psychovim_mask == "after_hours" and "sanity" or "after_hours"
-  M.apply(next_mode)
-  vim.notify(next_mode == "sanity" and "Mask on." or "After hours.")
+  require("psychovim.settings").toggle_mask()
 end
 
 function M.setup()
   vim.g.psychovim_mask = vim.g.psychovim_mask or "sanity"
   vim.api.nvim_create_user_command("Mask", function()
-    M.apply("sanity")
+    require("psychovim.settings").set("mask", "sanity")
     vim.notify("Mask on.")
   end, { desc = "Restore the restrained PSYCHOVIM palette" })
   vim.api.nvim_create_user_command("AfterHours", function()
-    M.apply("after_hours")
+    require("psychovim.settings").set("mask", "after_hours")
     vim.notify("After hours.")
   end, { desc = "Use the red-heavy PSYCHOVIM palette" })
 
