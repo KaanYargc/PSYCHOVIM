@@ -3,17 +3,24 @@ local map = vim.keymap.set
 map("i", "jk", "<Esc>", { desc = "Exit insert mode" })
 map("i", "kj", "<Esc>", { desc = "Exit insert mode" })
 
--- Signature PSYCHOVIM escape hatch: save everything and disappear.
--- Deliberately overrides the usual Ctrl-C / Ctrl-D behavior in normal,
--- insert and visual modes so new users always have an obvious way out.
-local function save_all_and_quit()
-  vim.cmd("wall")
-  vim.cmd("qall")
+-- SmartClose is PSYCHOVIM's signature escape hatch.
+-- Ctrl+C / Ctrl+D are intentionally easy to remember, but now ask before leaving.
+local function smart_close()
+  local mode = vim.api.nvim_get_mode().mode
+
+  if mode:sub(1, 1) == "i" then
+    vim.cmd("stopinsert")
+  elseif mode:sub(1, 1) == "t" then
+    local escape = vim.api.nvim_replace_termcodes("<C-\\><C-n>", true, false, true)
+    vim.api.nvim_feedkeys(escape, "n", false)
+  end
+
+  require("psychovim.smart_close").open()
 end
 
-for _, mode in ipairs({ "n", "i", "v" }) do
-  map(mode, "<C-c>", save_all_and_quit, { desc = "Save all & exit" })
-  map(mode, "<C-d>", save_all_and_quit, { desc = "Save all & exit" })
+for _, mode in ipairs({ "n", "i", "x", "t" }) do
+  map(mode, "<C-c>", smart_close, { desc = "SmartClose" })
+  map(mode, "<C-d>", smart_close, { desc = "SmartClose" })
 end
 
 map("n", "<leader>w", "<cmd>write<cr>", { desc = "Write file" })
