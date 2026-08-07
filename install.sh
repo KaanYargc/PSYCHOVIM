@@ -239,7 +239,7 @@ sync_plugins() {
   repair_plugin_checkout "nvim-lspconfig"
   say "plugins: syncing"
   for attempt in 1 2 3; do
-    if "$NVIM_EXEC" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then say "plugins: ${green}ok${reset}"; return 0; fi
+    if PSYCHOVIM_MAINTENANCE=1 "$NVIM_EXEC" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then say "plugins: ${green}ok${reset}"; return 0; fi
     say "${yellow}plugins:${reset} retry $attempt/3"; sleep $(( attempt * 2 ))
   done
   say "${yellow}plugins:${reset} incomplete — $SYNC_LOG"
@@ -250,7 +250,7 @@ sync_parsers() {
   mkdir -p "$CACHE_DIR"; : > "$PARSER_LOG"
   command -v tree-sitter >/dev/null 2>&1 || { say "parsers: skipped (tree-sitter CLI missing)"; return 0; }
   say "parsers: syncing"
-  if "$NVIM_EXEC" --headless "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" "+qa" >>"$PARSER_LOG" 2>&1; then
+  if PSYCHOVIM_MAINTENANCE=1 "$NVIM_EXEC" --headless "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" "+qa" >>"$PARSER_LOG" 2>&1; then
     say "parsers: ${green}ok${reset}"
   else
     say "${yellow}parsers:${reset} incomplete — $PARSER_LOG"
