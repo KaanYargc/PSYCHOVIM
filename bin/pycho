@@ -61,7 +61,7 @@ sync_plugins() {
   repair_plugin_checkout "nvim-lspconfig"
   say "plugins      syncing"
   for (( attempt=1; attempt<=attempts; attempt++ )); do
-    if "$NVIM_BIN" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then
+    if PSYCHOVIM_MAINTENANCE=1 "$NVIM_BIN" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then
       say "plugins      ${green}ok${reset}"
       return 0
     fi
@@ -89,7 +89,7 @@ sync_parsers() {
   fi
 
   say "parsers      syncing"
-  if "$NVIM_BIN" --headless \
+  if PSYCHOVIM_MAINTENANCE=1 "$NVIM_BIN" --headless \
     "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" \
     "+qa" >>"$PARSER_LOG" 2>&1; then
     say "parsers      ${green}ok${reset}"
@@ -202,7 +202,7 @@ update_psychovim() {
 show_status() {
   resolve_nvim
   say "PSYCHOVIM // STATUS"
-  say "nvim         $($NVIM_BIN --version | head -n 1)"
+  say "nvim         $("$NVIM_BIN" --version | head -n 1)"
   if [[ -d "$CONFIG_DIR/.git" ]]; then
     migrate_legacy_lockfile
     say "branch       $(git -C "$CONFIG_DIR" branch --show-current)"
