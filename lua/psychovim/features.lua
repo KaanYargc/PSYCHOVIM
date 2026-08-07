@@ -1,17 +1,29 @@
 local M = {}
 
+local function command(name, fn, desc)
+  if vim.fn.exists(":" .. name) == 0 then
+    vim.api.nvim_create_user_command(name, fn, { desc = desc })
+  end
+end
+
 function M.setup()
   local theme = require("psychovim.theme")
   local card = require("psychovim.business_card")
   local dorsia = require("psychovim.dorsia")
   local routine = require("psychovim.routine")
   local settings = require("psychovim.settings")
+  local actions = require("psychovim.pycho_actions")
+  local close = require("psychovim.pycho_close")
 
   theme.setup()
   card.setup()
   dorsia.setup()
   routine.setup()
   theme.apply(vim.g.psychovim_mask or "sanity")
+
+  command("PychoSave", actions.save, "Save the current buffer")
+  command("PychoClose", close.open, "Open PychoClose")
+  command("PychoBufferClose", actions.close_buffer, "Close the current buffer safely")
 
   local map = vim.keymap.set
   map("n", "<leader>pb", card.open, { desc = "Pycho Business Card" })
