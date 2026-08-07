@@ -31,7 +31,7 @@ jobs:
       - name: Install runtime tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y ripgrep gcc lua5.1
+          sudo apt-get install -y ripgrep gcc lua5.1 nodejs npm unzip
 
       - name: Parse Lua files
         run: find lua -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
@@ -51,6 +51,7 @@ jobs:
             "+lua assert(type(require('psychovim.pycho_actions').save) == 'function')" \
             "+lua assert(type(require('psychovim.pycho_close').open) == 'function')" \
             "+lua local s=require('psychovim.settings'); assert(type(s.get) == 'function'); assert(s.get('auto_update_config') ~= nil); assert(s.get('tab_width') ~= nil)" \
+            "+lua assert(vim.fn.exists(':MasonToolsInstallSync') == 2)" \
             "+lua assert(type(require('psychovim.dorsia').open) == 'function')" \
             "+lua assert(type(require('psychovim.business_card').open) == 'function')" \
             +qa
