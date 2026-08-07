@@ -1,4 +1,6 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
+local pycho_state = vim.fn.stdpath("state") .. "/psychovim"
+vim.fn.mkdir(pycho_state, "p")
 
 if not vim.uv.fs_stat(lazypath) then
   local result = vim.fn.system({
@@ -27,6 +29,7 @@ require("lazy").setup({
   { import = "plugins" },
   { import = "psychovim.plugin_overrides" },
 }, {
+  lockfile = pycho_state .. "/lazy-lock.json",
   concurrency = 2,
   git = {
     timeout = 300,
