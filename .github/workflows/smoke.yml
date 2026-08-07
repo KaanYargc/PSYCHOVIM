@@ -1,0 +1,47 @@
+name: smoke
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  neovim:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Neovim
+        uses: rhysd/action-setup-vim@v1
+        with:
+          neovim: true
+          version: stable
+
+      - name: Install runtime tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ripgrep gcc lua5.1
+
+      - name: Parse Lua files
+        run: find lua -name '*.lua' -print0 | xargs -0 -n1 luac5.1 -p
+
+      - name: Mount config
+        run: |
+          mkdir -p "$HOME/.config"
+          ln -s "$GITHUB_WORKSPACE" "$HOME/.config/nvim"
+
+      - name: Install plugins
+        run: nvim --headless "+Lazy! sync" +qa
+
+      - name: Startup smoke test
+        run: |
+          nvim --headless \
+            "+lua require('psychovim.theme').apply('sanity')" \
+            "+lua assert(type(require('psychovim.smart_actions').save) == 'function')" \
+            "+lua assert(type(require('psychovim.dorsia').open) == 'function')" \
+            "+lua assert(type(require('psychovim.business_card').open) == 'function')" \
+            +qa
