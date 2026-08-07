@@ -21,6 +21,7 @@ PSYCHOVIM now targets modern Neovim and includes:
 - Catppuccin Mocha with the PSYCHOVIM black/red palette
 - a custom Snacks dashboard
 - **SmartClose**, a built-in save/quit popup on `Ctrl+C` and `Ctrl+D`
+- one-command installer with automatic config backup
 - modular options, keymaps, autocmds, and plugin configuration
 
 ## Requirements
@@ -33,6 +34,30 @@ PSYCHOVIM now targets modern Neovim and includes:
 - `ripgrep` is recommended for Telescope live grep
 
 ## Installation
+
+### One command
+
+After this version is merged to `main`, install PSYCHOVIM with:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OnurByte/PSYCHOVIM/main/install.sh | bash
+```
+
+The installer:
+
+- checks that Git is available
+- warns if Neovim is missing or older than 0.12
+- backs up an existing config to `~/.config/nvim.backup-YYYYMMDD-HHMMSS`
+- clones PSYCHOVIM to `${XDG_CONFIG_HOME:-~/.config}/nvim`
+- leaves system packages alone instead of silently changing your machine
+
+To test the installer from the development branch before merge:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/OnurByte/PSYCHOVIM/develop/psychovim-v1/install.sh | PSYCHOVIM_BRANCH=develop/psychovim-v1 bash
+```
+
+### Manual install
 
 Back up an existing Neovim config first:
 
@@ -130,6 +155,7 @@ Run `:Lazy` to inspect plugins and `:checkhealth` to diagnose your local setup.
 ```text
 .
 ├── init.lua
+├── install.sh
 └── lua
     ├── plugins.lua
     └── psychovim
