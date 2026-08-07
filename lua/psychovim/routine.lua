@@ -11,7 +11,7 @@ local function close()
 end
 
 local function yesno(value)
-  return value and "IMMACULATE" or "REQUIRES ATTENTION"
+  return value and "OK" or "FIX IT"
 end
 
 local function compiler_available()
@@ -42,21 +42,21 @@ function M.open()
   local loaded, total = lazy_stats()
   local width = math.min(64, math.max(52, vim.o.columns - 10))
   local nvim_version = vim.version()
-  local mask = vim.g.psychovim_mask == "after_hours" and "AFTER HOURS" or "INTACT"
+  local mask = vim.g.psychovim_mask == "after_hours" and "AFTER HOURS" or "ON"
 
   local lines = {
     "",
     "  MORNING ROUTINE",
-    "  Appearance and environment inspection",
+    "  08:30 // system check",
     "",
     row("Neovim", string.format("%d.%d.%d", nvim_version.major, nvim_version.minor, nvim_version.patch), width - 4),
     row("Git", yesno(vim.fn.executable("git") == 1), width - 4),
     row("Ripgrep", yesno(vim.fn.executable("rg") == 1), width - 4),
-    row("Compiler", yesno(compiler_available()), width - 4),
-    row("Plugin inventory", string.format("%d / %d LOADED", loaded, total), width - 4),
-    row("Mask of sanity", mask, width - 4),
+    row("C compiler", yesno(compiler_available()), width - 4),
+    row("Plugins", string.format("%d / %d", loaded, total), width - 4),
+    row("Mask", mask, width - 4),
     "",
-    "  No visible imperfections. Proceed.",
+    "  Good. Get to work.",
     "",
   }
 
