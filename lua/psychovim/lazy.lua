@@ -12,7 +12,7 @@ if not vim.uv.fs_stat(lazypath) then
 
   if vim.v.shell_error ~= 0 then
     vim.api.nvim_echo({
-      { "Failed to install lazy.nvim:\n", "ErrorMsg" },
+      { "lazy.nvim bootstrap failed:\n", "ErrorMsg" },
       { result, "WarningMsg" },
     }, true, {})
     return
@@ -25,9 +25,26 @@ require("lazy").setup({
   { import = "plugins" },
   { import = "psychovim.plugin_overrides" },
 }, {
-  checker = { enabled = true, notify = false },
+  -- Unlimited parallel Git jobs are fast on a datacenter and stupid on flaky Wi-Fi.
+  concurrency = 2,
+  git = {
+    timeout = 300,
+    throttle = {
+      enabled = true,
+      rate = 2,
+      duration = 3000,
+    },
+  },
+  -- Don't turn every startup into a GitHub update sweep. :Lazy check exists.
+  checker = { enabled = false, notify = false },
   change_detection = { notify = false },
   install = { colorscheme = { "catppuccin" } },
+  headless = {
+    process = true,
+    log = true,
+    task = true,
+    colors = false,
+  },
   ui = {
     border = "rounded",
     icons = {
