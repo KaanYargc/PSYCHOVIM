@@ -1,8 +1,40 @@
 local settings = require("psychovim.settings")
+
 local enabled = function(key)
   return function()
     return settings.get(key) ~= false
   end
+end
+
+local function mason_enabled()
+  return settings.get("lsp") ~= false or settings.get("formatting") ~= false
+end
+
+local function lsp_servers()
+  local servers = { "lua_ls", "pyright", "ts_ls" }
+  if vim.fn.executable("go") == 1 then servers[#servers + 1] = "gopls" end
+  if vim.fn.executable("cargo") == 1 or vim.fn.executable("rustc") == 1 then
+    servers[#servers + 1] = "rust_analyzer"
+  end
+  return servers
+end
+
+local function mason_tools()
+  local tools = {}
+
+  if settings.get("formatting") ~= false then
+    vim.list_extend(tools, { "stylua", "ruff", "prettierd", "prettier" })
+  end
+
+  if settings.get("lsp") ~= false then
+    vim.list_extend(tools, { "lua-language-server", "pyright", "typescript-language-server" })
+    if vim.fn.executable("go") == 1 then tools[#tools + 1] = "gopls" end
+    if vim.fn.executable("cargo") == 1 or vim.fn.executable("rustc") == 1 then
+      tools[#tools + 1] = "rust-analyzer"
+    end
+  end
+
+  return tools
 end
 
 return {
@@ -190,9 +222,29 @@ return {
 
   {
     "mason-org/mason.nvim",
-    cond = enabled("lsp"),
+    cond = mason_enabled,
     opts = function()
-      return { ui = { border = settings.get("popup_border") or "rounded" } }
+      return {
+        max_concurrent_installers = 2,
+        ui = { border = settings.get("popup_border") or "rounded" },
+      }
+    end,
+  },
+  {
+    "WhoIsSethDaniel/mason-tool-installer.nvim",
+    cond = mason_enabled,
+    dependencies = { "mason-org/mason.nvim" },
+    opts = function()
+      return {
+        ensure_installed = mason_tools(),
+        auto_update = false,
+        run_on_start = false,
+        integrations = {
+          ["mason-lspconfig"] = false,
+          ["mason-null-ls"] = false,
+          ["mason-nvim-dap"] = false,
+        },
+      }
     end,
   },
   {
@@ -202,10 +254,12 @@ return {
       { "mason-org/mason.nvim" },
       "neovim/nvim-lspconfig",
     },
-    opts = {
-      ensure_installed = { "lua_ls", "pyright", "ts_ls", "gopls", "rust_analyzer" },
-      automatic_enable = true,
-    },
+    opts = function()
+      return {
+        ensure_installed = lsp_servers(),
+        automatic_enable = true,
+      }
+    end,
   },
   {
     "neovim/nvim-lspconfig",
