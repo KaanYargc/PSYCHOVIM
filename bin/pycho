@@ -3,10 +3,12 @@ set -Eeuo pipefail
 
 CONFIG_DIR="${PSYCHOVIM_DIR:-${PSYCHOVIM_CONFIG_DIR:-${XDG_CONFIG_HOME:-$HOME/.config}/nvim}}"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+STATE_HOME="${XDG_STATE_HOME:-$HOME/.local/state}"
 MANAGED_NVIM="${PSYCHOVIM_NVIM_DIR:-$DATA_HOME/psychovim/neovim}/bin/nvim"
 NVIM_BIN="${PSYCHOVIM_NVIM:-}"
 BRANCH="${PSYCHOVIM_BRANCH:-main}"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psychovim"
+SETTINGS_FILE="$STATE_HOME/nvim/psychovim/settings.json"
 LAZY_ROOT="$DATA_HOME/nvim/lazy"
 SYNC_LOG="$CACHE_DIR/lazy-sync.log"
 PARSER_LOG="$CACHE_DIR/parser-sync.log"
@@ -16,11 +18,29 @@ bold='\033[1m'; red='\033[31m'; green='\033[32m'; yellow='\033[33m'; reset='\033
 say() { printf '%b\n' "$*"; }
 die() { say "${red}error:${reset} $*" >&2; exit 1; }
 
+setting_on() {
+  local key="$1" default="${2:-true}"
+  if [[ -f "$SETTINGS_FILE" ]]; then
+    if grep -Eq '"'"$key"'"[[:space:]]*:[[:space:]]*false' "$SETTINGS_FILE"; then return 1; fi
+    if grep -Eq '"'"$key"'"[[:space:]]*:[[:space:]]*true' "$SETTINGS_FILE"; then return 0; fi
+  fi
+  [[ "$default" == "true" ]]
+}
+
 resolve_nvim() {
   if [[ -n "$NVIM_BIN" && -x "$NVIM_BIN" ]]; then return 0; fi
   if [[ -x "$MANAGED_NVIM" ]]; then NVIM_BIN="$MANAGED_NVIM"; return 0; fi
   if command -v nvim >/dev/null 2>&1; then NVIM_BIN="$(command -v nvim)"; return 0; fi
   die "nvim not found; rerun the PSYCHOVIM installer"
+}
+
+migrate_legacy_lockfile() {
+  local old="$CONFIG_DIR/lazy-lock.json"
+  local new="$STATE_HOME/nvim/psychovim/lazy-lock.json"
+  [[ -f "$old" ]] || return 0
+  if git -C "$CONFIG_DIR" ls-files --error-unmatch lazy-lock.json >/dev/null 2>&1; then return 0; fi
+  mkdir -p "$(dirname "$new")"
+  if [[ ! -f "$new" ]]; then mv "$old" "$new"; else rm -f "$old"; fi
 }
 
 repair_plugin_checkout() {
@@ -35,18 +55,20 @@ repair_plugin_checkout() {
 }
 
 sync_plugins() {
-  local attempt
+  local attempts="${1:-3}" attempt
   mkdir -p "$CACHE_DIR"
   : > "$SYNC_LOG"
   repair_plugin_checkout "nvim-lspconfig"
   say "plugins      syncing"
-  for attempt in 1 2 3; do
+  for (( attempt=1; attempt<=attempts; attempt++ )); do
     if "$NVIM_BIN" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then
       say "plugins      ${green}ok${reset}"
       return 0
     fi
-    say "plugins      ${yellow}retry $attempt/3${reset}"
-    sleep $(( attempt * 2 ))
+    if (( attempt < attempts )); then
+      say "plugins      ${yellow}retry $attempt/$attempts${reset}"
+      sleep $(( attempt * 2 ))
+    fi
   done
   say "plugins      ${yellow}incomplete${reset}"
   say "log          $SYNC_LOG"
@@ -56,10 +78,16 @@ sync_plugins() {
 sync_parsers() {
   mkdir -p "$CACHE_DIR"
   : > "$PARSER_LOG"
+
+  if ! setting_on treesitter true; then
+    say "parsers      off in settings"
+    return 0
+  fi
   if ! command -v tree-sitter >/dev/null 2>&1; then
     say "parsers      skipped (tree-sitter CLI missing)"
     return 0
   fi
+
   say "parsers      syncing"
   if "$NVIM_BIN" --headless \
     "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" \
@@ -67,17 +95,21 @@ sync_parsers() {
     say "parsers      ${green}ok${reset}"
     return 0
   fi
+
   say "parsers      ${yellow}incomplete${reset}"
   say "log          $PARSER_LOG"
   return 1
 }
 
-update_psychovim() {
-  resolve_nvim
-  command -v git >/dev/null 2>&1 || die "git is required"
-  [[ -d "$CONFIG_DIR/.git" ]] || die "$CONFIG_DIR is not a git checkout"
+config_dirty() {
+  [[ -n "$(git -C "$CONFIG_DIR" status --porcelain 2>/dev/null || true)" ]]
+}
 
-  if [[ -n "$(git -C "$CONFIG_DIR" status --porcelain)" ]]; then
+update_config_strict() {
+  [[ -d "$CONFIG_DIR/.git" ]] || die "$CONFIG_DIR is not a git checkout"
+  migrate_legacy_lockfile
+
+  if config_dirty; then
     say "config       ${yellow}dirty${reset}"
     git -C "$CONFIG_DIR" status --short
     die "refusing to update over local config changes"
@@ -85,7 +117,6 @@ update_psychovim() {
 
   local before after count
   before="$(git -C "$CONFIG_DIR" rev-parse HEAD)"
-  say "${red}${bold}PSYCHOVIM${reset} // UPDATE"
   say "config       fetching $BRANCH"
   git -C "$CONFIG_DIR" fetch --prune origin "$BRANCH"
   git -C "$CONFIG_DIR" checkout -q "$BRANCH"
@@ -98,12 +129,74 @@ update_psychovim() {
     count="$(git -C "$CONFIG_DIR" rev-list --count "$before..$after" 2>/dev/null || printf '?')"
     say "config       ${green}${count} commit(s)${reset}"
   fi
+}
+
+update_config_soft() {
+  if [[ ! -d "$CONFIG_DIR/.git" ]]; then
+    say "config       ${yellow}not a git checkout${reset}"
+    return 1
+  fi
+
+  migrate_legacy_lockfile
+  if config_dirty; then
+    say "config       ${yellow}local changes; skipped${reset}"
+    return 0
+  fi
+
+  local before after count
+  before="$(git -C "$CONFIG_DIR" rev-parse HEAD 2>/dev/null || true)"
+  if ! git -C "$CONFIG_DIR" fetch -q --prune origin "$BRANCH"; then
+    say "config       ${yellow}network miss${reset}"
+    return 1
+  fi
+  if ! git -C "$CONFIG_DIR" merge -q --ff-only "origin/$BRANCH"; then
+    say "config       ${yellow}not fast-forward; skipped${reset}"
+    return 1
+  fi
+  after="$(git -C "$CONFIG_DIR" rev-parse HEAD 2>/dev/null || true)"
+
+  if [[ "$before" == "$after" ]]; then
+    say "config       ${green}current${reset}"
+  else
+    count="$(git -C "$CONFIG_DIR" rev-list --count "$before..$after" 2>/dev/null || printf '?')"
+    say "config       ${green}${count} new commit(s)${reset}"
+  fi
+}
+
+startup_update() {
+  [[ "${PSYCHOVIM_NO_AUTOUPDATE:-0}" == "1" ]] && return 0
+
+  local do_config=false do_plugins=false do_parsers=false
+  setting_on auto_update_config true && do_config=true
+  setting_on auto_update_plugins true && do_plugins=true
+  setting_on auto_update_parsers true && do_parsers=true
+
+  if ! $do_config && ! $do_plugins && ! $do_parsers; then return 0; fi
+
+  resolve_nvim
+  say "${red}${bold}PSYCHOVIM${reset} // CHECK"
+  $do_config && update_config_soft || true
+  $do_plugins && sync_plugins 1 || true
+  $do_parsers && sync_parsers || true
+  say ""
+}
+
+update_psychovim() {
+  resolve_nvim
+  command -v git >/dev/null 2>&1 || die "git is required"
+
+  say "${red}${bold}PSYCHOVIM${reset} // UPDATE"
+  update_config_strict
 
   local rc=0
-  sync_plugins || rc=1
+  sync_plugins 3 || rc=1
   sync_parsers || rc=1
   say ""
-  if (( rc == 0 )); then say "${green}updated.${reset}"; else say "${yellow}updated with network scars.${reset} logs: $CACHE_DIR"; fi
+  if (( rc == 0 )); then
+    say "${green}updated.${reset}"
+  else
+    say "${yellow}updated with network scars.${reset} logs: $CACHE_DIR"
+  fi
 }
 
 show_status() {
@@ -111,32 +204,65 @@ show_status() {
   say "PSYCHOVIM // STATUS"
   say "nvim         $($NVIM_BIN --version | head -n 1)"
   if [[ -d "$CONFIG_DIR/.git" ]]; then
+    migrate_legacy_lockfile
     say "branch       $(git -C "$CONFIG_DIR" branch --show-current)"
     say "commit       $(git -C "$CONFIG_DIR" rev-parse --short HEAD)"
-    [[ -z "$(git -C "$CONFIG_DIR" status --porcelain)" ]] && say "config       clean" || say "config       dirty"
+    if config_dirty; then say "config       dirty"; else say "config       clean"; fi
   else
     say "config       missing"
   fi
+  setting_on auto_update_config true && say "auto config  on" || say "auto config  off"
+  setting_on auto_update_plugins true && say "auto plugins on" || say "auto plugins off"
+  setting_on auto_update_parsers true && say "auto parsers on" || say "auto parsers off"
 }
 
 show_help() {
   cat <<'EOF'
 pycho [file|dir]
-pycho update       update config, plugins and parsers
+pycho update       update config, plugins and parsers now
 pycho settings     open PychoSettings
-pycho status       show install state
+pycho status       show install and update state
 pycho doctor       open Morning Routine
 pycho parsers      sync Treesitter parsers
 pycho help
+
+Every normal launch checks updates first. Disable individual update lanes in
+PychoSettings, or use PSYCHOVIM_NO_AUTOUPDATE=1 for an emergency no-network boot.
 EOF
 }
 
 case "${1:-}" in
-  update) shift; update_psychovim "$@" ;;
-  settings) shift; resolve_nvim; exec "$NVIM_BIN" "$@" "+PychoSettings" ;;
-  status) shift; show_status "$@" ;;
-  doctor) shift; resolve_nvim; exec "$NVIM_BIN" "$@" "+MorningRoutine" ;;
-  parsers) shift; resolve_nvim; sync_parsers ;;
-  help|-h|--help) show_help ;;
-  *) resolve_nvim; exec "$NVIM_BIN" "$@" ;;
+  update)
+    shift
+    update_psychovim "$@"
+    ;;
+  settings)
+    shift
+    startup_update
+    resolve_nvim
+    exec "$NVIM_BIN" "$@" "+PychoSettings"
+    ;;
+  status)
+    shift
+    show_status "$@"
+    ;;
+  doctor)
+    shift
+    startup_update
+    resolve_nvim
+    exec "$NVIM_BIN" "$@" "+MorningRoutine"
+    ;;
+  parsers)
+    shift
+    resolve_nvim
+    sync_parsers
+    ;;
+  help|-h|--help)
+    show_help
+    ;;
+  *)
+    startup_update
+    resolve_nvim
+    exec "$NVIM_BIN" "$@"
+    ;;
 esac
