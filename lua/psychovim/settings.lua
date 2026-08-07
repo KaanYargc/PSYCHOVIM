@@ -26,8 +26,7 @@ local function save()
   vim.fn.mkdir(settings_dir, "p")
   local ok, encoded = pcall(vim.json.encode, config)
   if not ok then return false end
-  local wrote = pcall(vim.fn.writefile, { encoded }, settings_file)
-  return wrote
+  return pcall(vim.fn.writefile, { encoded }, settings_file)
 end
 
 function M.load()
@@ -56,11 +55,6 @@ function M.get(key)
   return config
 end
 
-local function apply_keymaps()
-  local ok, keymaps = pcall(require, "psychovim.keymaps")
-  if ok and type(keymaps.apply) == "function" then keymaps.apply() end
-end
-
 local function apply_item(key)
   if key == "mask" then
     vim.g.psychovim_mask = config.mask
@@ -78,8 +72,6 @@ local function apply_item(key)
     vim.o.confirm = config.confirm
   elseif key == "plugin_update_check" then
     vim.notify("Pycho · checker changes after restart")
-  else
-    apply_keymaps()
   end
 end
 
@@ -164,12 +156,6 @@ end
 
 local function reset_all()
   config = vim.deepcopy(defaults)
-  M.load_runtime()
-  save()
-  render()
-end
-
-function M.load_runtime()
   vim.g.psychovim_mask = config.mask
   vim.g.disable_autoformat = not config.autoformat
   vim.o.relativenumber = config.relativenumber
@@ -178,7 +164,8 @@ function M.load_runtime()
   vim.diagnostic.enable(config.diagnostics)
   local ok, theme = pcall(require, "psychovim.theme")
   if ok then theme.apply(config.mask) end
-  apply_keymaps()
+  save()
+  render()
 end
 
 function M.open()
@@ -221,7 +208,10 @@ function M.open()
 end
 
 function M.setup()
-  vim.api.nvim_create_user_command("PychoSettings", M.open, { desc = "Open Pycho settings" })
+  M.load()
+  if vim.fn.exists(":PychoSettings") == 0 then
+    vim.api.nvim_create_user_command("PychoSettings", M.open, { desc = "Open Pycho settings" })
+  end
 end
 
 return M
