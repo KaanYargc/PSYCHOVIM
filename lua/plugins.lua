@@ -7,30 +7,52 @@ local enabled = function(key)
 end
 
 local function mason_enabled()
-  return settings.get("lsp") ~= false or settings.get("formatting") ~= false
+  return settings.get("lsp") ~= false
+    or settings.get("formatting") ~= false
+    or settings.get("linting") ~= false
 end
 
 local function lsp_servers()
-  local servers = { "lua_ls", "pyright", "ts_ls" }
-  if vim.fn.executable("go") == 1 then servers[#servers + 1] = "gopls" end
-  if vim.fn.executable("cargo") == 1 or vim.fn.executable("rustc") == 1 then
+  local servers = {}
+
+  if settings.get("lsp_lua") ~= false then servers[#servers + 1] = "lua_ls" end
+  if settings.get("lsp_python") ~= false then servers[#servers + 1] = "pyright" end
+  if settings.get("lsp_typescript") ~= false then servers[#servers + 1] = "ts_ls" end
+  if settings.get("lsp_go") ~= false and vim.fn.executable("go") == 1 then
+    servers[#servers + 1] = "gopls"
+  end
+  if settings.get("lsp_rust") ~= false and (vim.fn.executable("cargo") == 1 or vim.fn.executable("rustc") == 1) then
     servers[#servers + 1] = "rust_analyzer"
   end
+
   return servers
 end
 
 local function mason_tools()
-  local tools = {}
+  local tools, seen = {}, {}
+  local function add(name)
+    if not seen[name] then
+      seen[name] = true
+      tools[#tools + 1] = name
+    end
+  end
 
   if settings.get("formatting") ~= false then
-    vim.list_extend(tools, { "stylua", "ruff", "prettierd", "prettier" })
+    for _, name in ipairs({ "stylua", "ruff", "prettierd", "prettier" }) do add(name) end
+  end
+
+  if settings.get("linting") ~= false then
+    add("ruff")
+    add("eslint_d")
   end
 
   if settings.get("lsp") ~= false then
-    vim.list_extend(tools, { "lua-language-server", "pyright", "typescript-language-server" })
-    if vim.fn.executable("go") == 1 then tools[#tools + 1] = "gopls" end
-    if vim.fn.executable("cargo") == 1 or vim.fn.executable("rustc") == 1 then
-      tools[#tools + 1] = "rust-analyzer"
+    if settings.get("lsp_lua") ~= false then add("lua-language-server") end
+    if settings.get("lsp_python") ~= false then add("pyright") end
+    if settings.get("lsp_typescript") ~= false then add("typescript-language-server") end
+    if settings.get("lsp_go") ~= false and vim.fn.executable("go") == 1 then add("gopls") end
+    if settings.get("lsp_rust") ~= false and (vim.fn.executable("cargo") == 1 or vim.fn.executable("rustc") == 1) then
+      add("rust-analyzer")
     end
   end
 
@@ -343,6 +365,52 @@ return {
         return { timeout_ms = 1200, lsp_format = "fallback" }
       end,
     },
+  },
+
+  {
+    "mfussenegger/nvim-lint",
+    cond = enabled("linting"),
+    event = { "BufReadPost", "BufNewFile" },
+    config = function()
+      local lint = require("lint")
+      local eslint_configs = {
+        "eslint.config.js", "eslint.config.mjs", "eslint.config.cjs",
+        ".eslintrc", ".eslintrc.js", ".eslintrc.cjs", ".eslintrc.json",
+        ".eslintrc.yaml", ".eslintrc.yml",
+      }
+
+      local function has_eslint_config(buf)
+        local name = vim.api.nvim_buf_get_name(buf)
+        if name == "" then return false end
+        local found = vim.fs.find(eslint_configs, {
+          path = vim.fs.dirname(name),
+          upward = true,
+          stop = vim.uv.os_homedir(),
+        })
+        return #found > 0
+      end
+
+      local function lint_buffer(buf)
+        if not vim.api.nvim_buf_is_valid(buf) then return end
+        local ft = vim.bo[buf].filetype
+        if ft == "python" then
+          lint.try_lint("ruff")
+        elseif ft == "javascript" or ft == "javascriptreact" or ft == "typescript" or ft == "typescriptreact" then
+          if has_eslint_config(buf) then lint.try_lint("eslint_d") end
+        end
+      end
+
+      vim.api.nvim_create_autocmd("BufWritePost", {
+        group = vim.api.nvim_create_augroup("PychoLint", { clear = true }),
+        callback = function(args)
+          if settings.get("lint_on_save") then lint_buffer(args.buf) end
+        end,
+      })
+
+      vim.keymap.set("n", "<leader>cl", function()
+        lint_buffer(vim.api.nvim_get_current_buf())
+      end, { desc = "PychoLint" })
+    end,
   },
 
   {
