@@ -15,6 +15,7 @@ PYCHO_BIN="$BIN_DIR/pycho"
 LAZY_ROOT="$DATA_HOME/nvim/lazy"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psychovim"
 SYNC_LOG="$CACHE_DIR/lazy-sync.log"
+TOOL_LOG="$CACHE_DIR/mason-tools.log"
 PARSER_LOG="$CACHE_DIR/parser-sync.log"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP=""
@@ -246,6 +247,16 @@ sync_plugins() {
   return 0
 }
 
+sync_tools() {
+  mkdir -p "$CACHE_DIR"; : > "$TOOL_LOG"
+  say "tools: installing"
+  if PSYCHOVIM_MAINTENANCE=1 "$NVIM_EXEC" --headless "+MasonToolsInstallSync" "+qa" >>"$TOOL_LOG" 2>&1; then
+    say "tools: ${green}ok${reset}"
+  else
+    say "${yellow}tools:${reset} incomplete — $TOOL_LOG"
+  fi
+}
+
 sync_parsers() {
   mkdir -p "$CACHE_DIR"; : > "$PARSER_LOG"
   command -v tree-sitter >/dev/null 2>&1 || { say "parsers: skipped (tree-sitter CLI missing)"; return 0; }
@@ -282,6 +293,7 @@ if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TARGET"; then restore_
 
 install_launcher
 sync_plugins
+sync_tools
 sync_parsers
 say "${green}${bold}done.${reset} run: ${bold}pycho${reset}"
 [[ -n "$BACKUP" ]] && say "old config: ${bold}${BACKUP}${reset}"
