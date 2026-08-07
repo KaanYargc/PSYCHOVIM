@@ -1,114 +1,150 @@
-# PSYCHOVIM 🔪
+# PSYCHOVIM
 
-A dark, opinionated Neovim distribution inspired by the obsessive visual style of *American Psycho* — rebuilt as a practical daily development environment instead of a theme-only config.
+A dark, opinionated Neovim distribution inspired by the immaculate corporate surface, status anxiety, ritual, repetition, and slowly slipping reality of *American Psycho*.
 
-> "I have to return some videotapes."
+PSYCHOVIM is not meant to be a red-and-black horror skin. It should look controlled first, feel strange second, and stay useful the entire time.
 
-## What changed in v1
+## Install
 
-PSYCHOVIM now targets modern Neovim and includes:
-
-- `lazy.nvim` plugin management
-- Neovim 0.12 native LSP configuration
-- Mason-managed language servers
-- Blink completion
-- format-on-save with Conform
-- Telescope fuzzy finding
-- nvim-tree file navigation
-- current nvim-treesitter API
-- Git signs and diagnostics
-- which-key discovery
-- Catppuccin Mocha with the PSYCHOVIM black/red palette
-- a custom Snacks dashboard
-- **SmartClose**, a built-in save/quit popup on `Ctrl+C` and `Ctrl+D`
-- one-command installer with automatic config backup
-- the `pycho` launcher command
-- modular options, keymaps, autocmds, and plugin configuration
-
-## Requirements
-
-- Neovim **0.12+**
-- Git
-- a C compiler (required by Treesitter parsers)
-- `curl` and `tar`
-- a Nerd Font is recommended for icons
-- `ripgrep` is recommended for Telescope live grep
-
-## Installation
-
-### One command
-
-Install PSYCHOVIM with:
+Requirements: Neovim **0.12+**, Git, a C compiler, `curl`, `tar`. A Nerd Font and `ripgrep` are recommended.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OnurByte/PSYCHOVIM/main/install.sh | bash
 ```
 
-The installer:
-
-- checks that Git is available
-- warns if Neovim is missing or older than 0.12
-- backs up an existing config to `~/.config/nvim.backup-YYYYMMDD-HHMMSS`
-- clones PSYCHOVIM to `${XDG_CONFIG_HOME:-~/.config}/nvim`
-- installs a `pycho` launcher under `~/.local/bin`
-- adds `~/.local/bin` to Bash/Zsh PATH when needed
-- restores the previous Neovim config automatically if cloning fails
-- leaves system packages alone instead of silently changing your machine
-
-After installation, launch PSYCHOVIM with:
+The installer backs up an existing Neovim config, installs PSYCHOVIM to `${XDG_CONFIG_HOME:-~/.config}/nvim`, and creates the launcher:
 
 ```bash
 pycho
+pycho path/to/file.lua
+pycho path/to/project
 ```
 
-You can also open files and directories directly:
+If cloning fails, the previous config is restored automatically.
 
-```bash
-pycho app.lua
-pycho .
+## The PSYCHOVIM layer
+
+### SmartClose
+
+`Ctrl+C` or `Ctrl+D` opens a centered exit dialog from normal, insert, visual, or terminal mode:
+
+1. Save all & quit
+2. Quit without saving
+3. Cancel
+
+The popup shows how many modified buffers are still open.
+
+### SmartSave
+
+`Ctrl+S` saves the current file from normal, insert, or visual mode. An unnamed buffer gets a Save As prompt instead of an error.
+
+Inside terminal mode, `Ctrl+S` is intercepted with an explanation instead of being allowed to trigger Unix terminal flow control and making the screen appear frozen.
+
+### SmartBufferClose
+
+`<leader>bd` closes a clean buffer immediately. If it contains unsaved changes, PSYCHOVIM asks:
+
+1. Save & close
+2. Close without saving
+3. Cancel
+
+The global Neovim `confirm` option is also enabled, so plain commands such as `:q`, `:edit`, and `:bdelete` ask what to do with unsaved work instead of failing with an opaque error.
+
+### Familiar shortcuts
+
+PSYCHOVIM deliberately smooths a few Vim defaults that are surprising to people coming from other editors:
+
+| Key | PSYCHOVIM behavior |
+| --- | --- |
+| `Ctrl+C` / `Ctrl+D` | SmartClose |
+| `Ctrl+S` | SmartSave |
+| `Ctrl+Z` | Undo instead of suspending the editor |
+| `Ctrl+Shift+Z` | Redo where the terminal can distinguish the key |
+| `Ctrl+F` | Fuzzy search inside the current file |
+| `Ctrl+P` | Find files |
+| `Ctrl+A` | Select all |
+| Visual `p` | Paste without destroying the yank register |
+| Terminal `Esc` | Return to terminal-normal mode |
+
+Native suspension remains available with `:suspend` or `:stop`.
+
+## American Psycho identity
+
+### Mask of Sanity
+
+The default palette is restrained: near-black surfaces, off-white typography, muted corporate borders, and blood red only where it means something.
+
+```vim
+:Mask
+:AfterHours
 ```
 
-If the installer had to add `~/.local/bin` to PATH, open a new terminal or source your shell config before running `pycho`.
+Or toggle with `<leader>pm`.
 
-### Manual install
+`Mask` restores the controlled corporate surface. `AfterHours` lets the red accent spread into the interface without turning the editor into a generic horror theme.
 
-Back up an existing Neovim config first:
+### Pierce & Pierce Business Card
 
-```bash
-mv ~/.config/nvim ~/.config/nvim.backup
+```vim
+:BusinessCard
 ```
 
-Clone PSYCHOVIM:
+The card shows the current Git account/branch, office path, loaded plugin inventory, and active LSP count in an intentionally over-serious Pierce & Pierce presentation.
 
-```bash
-git clone https://github.com/OnurByte/PSYCHOVIM.git ~/.config/nvim
+Shortcut: `<leader>pb`.
+
+### Morning Routine
+
+```vim
+:MorningRoutine
 ```
 
-Start Neovim:
+Runs a compact environment inspection for Neovim, Git, ripgrep, compiler availability, plugin inventory, and the current mask state.
 
-```bash
-nvim
+Shortcut: `<leader>pr`.
+
+### Dorsia
+
+Dorsia is PSYCHOVIM's project session manager.
+
+```vim
+:DorsiaSave
+:Dorsia
+:DorsiaForget
 ```
 
-`lazy.nvim` bootstraps itself on first launch. Treesitter parsers and configured LSP servers are then installed through their respective managers.
+- `:DorsiaSave` reserves the current project layout.
+- `:Dorsia` lists saved reservations and restores one.
+- `:DorsiaForget` cancels the reservation for the current project.
+- Sessions are quietly refreshed on exit.
+- Dorsia refuses to load another session while unsaved buffers are present.
 
-## SmartClose
+Shortcuts:
 
-Leaving Vim should not require remembering `:wqa`, but it also should not throw away work by accident.
+| Key | Action |
+| --- | --- |
+| `<leader>pd` | Open Dorsia |
+| `<leader>ps` | Save reservation |
+| `<leader>px` | Forget reservation |
 
-Press `Ctrl+C` or `Ctrl+D` from normal, insert, visual, or terminal mode to open **SmartClose** in a centered popup.
+## Development environment
 
-SmartClose shows the number of modified buffers and offers:
+PSYCHOVIM ships as a practical daily config, not only a themed dashboard.
 
-1. **Save all & quit** — writes all writable buffers, then exits.
-2. **Quit without saving** — exits immediately with `qa!`.
-3. **Cancel** — returns to the editor.
+- `lazy.nvim` plugin management
+- Neovim native LSP configuration
+- Mason-managed language servers
+- Blink completion
+- Conform format-on-save
+- Telescope fuzzy finding
+- nvim-tree navigation
+- nvim-treesitter syntax parsing
+- gitsigns
+- which-key
+- Snacks dashboard, picker, and input UI
+- Catppuccin as the syntax-color foundation with PSYCHOVIM highlight overrides
 
-Use `1/2/3`, `j/k`, arrow keys and `Enter`; `Esc` or `q` cancels.
-
-## Default language servers
-
-Mason is configured to install:
+Default language servers:
 
 - `lua_ls`
 - `pyright`
@@ -116,29 +152,20 @@ Mason is configured to install:
 - `gopls`
 - `rust_analyzer`
 
-Open `:Mason` to install or remove additional tooling.
-
-## Completion and formatting
-
-Completion is provided by `blink.cmp` using LSP, path, snippets, and buffer sources.
-
-Formatting is handled by Conform. The default formatter map includes:
+Default formatters:
 
 - Lua → `stylua`
 - Python → `ruff_format`
-- JavaScript / TypeScript / JSON / Markdown → `prettierd`, falling back to `prettier`
+- JS / TS / JSON / Markdown → `prettierd`, then `prettier`
 
-Use `<leader>cf` to format manually.
+Manual format: `<leader>cf`.
 
-If a formatter executable is not installed, install it with your system package manager or Mason where supported.
-
-## Keybindings
+## Main keybindings
 
 Leader is `Space`.
 
 | Key | Action |
 | --- | --- |
-| `<C-c>` / `<C-d>` | Open SmartClose |
 | `<leader>ff` | Find files |
 | `<leader>fg` | Live grep |
 | `<leader>fb` | Buffers |
@@ -149,97 +176,59 @@ Leader is `Space`.
 | `<leader>ca` | LSP code action |
 | `<leader>rn` | LSP rename |
 | `gd` | Go to definition |
-| `gr` | Find references |
+| `gr` | References |
 | `K` | Hover documentation |
 | `[d` / `]d` | Previous / next diagnostic |
 | `<leader>dd` | Diagnostic popup |
-| `<leader>bd` | Delete buffer |
 | `<Tab>` / `<S-Tab>` | Next / previous buffer |
 | `<C-h/j/k/l>` | Navigate windows |
-| `<leader>sv` | Vertical split |
-| `<leader>sh` | Horizontal split |
+| `<leader>sv` / `<leader>sh` | Split window |
 | `<leader>tt` | Terminal |
 | `jk` / `kj` | Leave insert mode |
-
-Run `:Lazy` to inspect plugins and `:checkhealth` to diagnose your local setup.
 
 ## Structure
 
 ```text
 .
+├── .github/workflows/smoke.yml
 ├── init.lua
 ├── install.sh
 └── lua
     ├── plugins.lua
     └── psychovim
         ├── autocmds.lua
+        ├── business_card.lua
+        ├── dorsia.lua
+        ├── features.lua
         ├── keymaps.lua
         ├── lazy.lua
         ├── options.lua
-        └── smart_close.lua
+        ├── plugin_overrides.lua
+        ├── routine.lua
+        ├── smart_actions.lua
+        ├── smart_close.lua
+        └── theme.lua
 ```
 
-The project intentionally keeps the distribution small enough to understand. Core behavior lives under `lua/psychovim/`; plugin specifications live in `lua/plugins.lua`.
+## Health and troubleshooting
+
+```vim
+:checkhealth
+:Lazy
+:Mason
+:ConformInfo
+```
+
+If icons look wrong, use a Nerd Font. If live grep is unavailable, install `ripgrep`.
+
+## CI
+
+Every push to `main` runs a GitHub Actions smoke test that installs stable Neovim, parses every Lua file, installs the plugin set, starts PSYCHOVIM headlessly, and verifies the custom Smart/Mask/Dorsia modules can load.
 
 ## Philosophy
 
-PSYCHOVIM should feel distinctive in actual use, not only in screenshots. Opinionated shortcuts are part of the distribution when they remove friction, but irreversible actions should still make their intent obvious. SmartClose is the model: `Ctrl+C` / `Ctrl+D` are deliberately unconventional exit keys, wrapped in an explicit confirmation UI.
+The joke should never be the only feature.
 
-The old configuration used Packer and committed generated `packer_compiled.lua` output. v1 removes that artifact and moves dependency management to `lazy.nvim`.
+PSYCHOVIM uses the source material's obsession with surfaces, routine, status, cataloguing, and unstable identity as interface rules: the UI is restrained, the named systems perform real work, and irreversible actions are explicit.
 
-## Troubleshooting
-
-### `pycho` command not found
-
-The installer places the launcher at `~/.local/bin/pycho`. Open a new terminal after installation. If your shell does not load that directory automatically, add this to your shell profile:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-### Plugins fail to install
-
-Check that `git` is available, then run:
-
-```vim
-:Lazy sync
-```
-
-### LSP is not running
-
-Run:
-
-```vim
-:Mason
-:checkhealth vim.lsp
-```
-
-### Treesitter parser errors
-
-Run:
-
-```vim
-:TSUpdate
-:checkhealth vim.treesitter
-```
-
-### Icons look broken
-
-Use a Nerd Font in your terminal emulator.
-
-## Roadmap
-
-Next useful additions:
-
-- first-class DAP/debugging profiles
-- integrated test runner
-- project-local formatter/LSP overrides
-- startup performance budget and benchmark command
-- install smoke test in GitHub Actions
-- optional minimal / full profiles
-
-## License
-
-MIT.
-
-PSYCHOVIM is an unofficial fan-made configuration and is not affiliated with the creators or rights holders of *American Psycho*.
+MIT. PSYCHOVIM is an unofficial fan-made configuration and is not affiliated with the creators or rights holders of *American Psycho*.
