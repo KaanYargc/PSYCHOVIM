@@ -29,7 +29,7 @@ setting_on() {
 }
 
 tooling_enabled() {
-  setting_on lsp true || setting_on formatting true
+  setting_on lsp true || setting_on formatting true || setting_on linting true
 }
 
 resolve_nvim() {
