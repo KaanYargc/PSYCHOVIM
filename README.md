@@ -116,7 +116,7 @@ Dorsia is PSYCHOVIM's project session manager.
 - `:DorsiaSave` reserves the current project layout.
 - `:Dorsia` lists saved reservations and restores one.
 - `:DorsiaForget` cancels the reservation for the current project.
-- Sessions are quietly refreshed on exit.
+- Real file/project sessions are quietly refreshed on exit; an empty `pycho` launch does not create junk reservations.
 - Dorsia refuses to load another session while unsaved buffers are present.
 
 Shortcuts:
