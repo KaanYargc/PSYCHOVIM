@@ -20,6 +20,7 @@ PSYCHOVIM now targets modern Neovim and includes:
 - which-key discovery
 - Catppuccin Mocha with the PSYCHOVIM black/red palette
 - a custom Snacks dashboard
+- **SmartClose**, a built-in save/quit popup on `Ctrl+C` and `Ctrl+D`
 - modular options, keymaps, autocmds, and plugin configuration
 
 ## Requirements
@@ -53,6 +54,20 @@ nvim
 
 `lazy.nvim` bootstraps itself on first launch. Treesitter parsers and configured LSP servers are then installed through their respective managers.
 
+## SmartClose
+
+Leaving Vim should not require remembering `:wqa`, but it also should not throw away work by accident.
+
+Press `Ctrl+C` or `Ctrl+D` from normal, insert, visual, or terminal mode to open **SmartClose** in a centered popup.
+
+SmartClose shows the number of modified buffers and offers:
+
+1. **Save all & quit** — writes all writable buffers, then exits.
+2. **Quit without saving** — exits immediately with `qa!`.
+3. **Cancel** — returns to the editor.
+
+Use `1/2/3`, `j/k`, arrow keys and `Enter`; `Esc` or `q` cancels.
+
 ## Default language servers
 
 Mason is configured to install:
@@ -85,6 +100,7 @@ Leader is `Space`.
 
 | Key | Action |
 | --- | --- |
+| `<C-c>` / `<C-d>` | Open SmartClose |
 | `<leader>ff` | Find files |
 | `<leader>fg` | Live grep |
 | `<leader>fb` | Buffers |
@@ -120,14 +136,15 @@ Run `:Lazy` to inspect plugins and `:checkhealth` to diagnose your local setup.
         ├── autocmds.lua
         ├── keymaps.lua
         ├── lazy.lua
-        └── options.lua
+        ├── options.lua
+        └── smart_close.lua
 ```
 
 The project intentionally keeps the distribution small enough to understand. Core behavior lives under `lua/psychovim/`; plugin specifications live in `lua/plugins.lua`.
 
 ## Philosophy
 
-PSYCHOVIM should feel distinctive without sabotaging normal editor behavior. Theme jokes stay in presentation; destructive or surprising keybindings do not.
+PSYCHOVIM should feel distinctive in actual use, not only in screenshots. Opinionated shortcuts are part of the distribution when they remove friction, but irreversible actions should still make their intent obvious. SmartClose is the model: `Ctrl+C` / `Ctrl+D` are deliberately unconventional exit keys, wrapped in an explicit confirmation UI.
 
 The old configuration used Packer and committed generated `packer_compiled.lua` output. v1 removes that artifact and moves dependency management to `lazy.nvim`.
 
