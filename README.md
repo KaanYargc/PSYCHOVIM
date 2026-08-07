@@ -22,9 +22,11 @@ The installer handles more than the config. On supported Linux package managers 
 
 Neovim 0.12+ does not need to exist beforehand. If it is missing or too old, PSYCHOVIM pulls the official stable build into `~/.local/share/psychovim/neovim`. The tree-sitter CLI is also installed from its official release binary into the user account.
 
-System packages may require `sudo`. Neovim, tree-sitter, PSYCHOVIM and the launcher themselves stay under your home directory.
+After the plugins land, Mason installs the editor tools the config actually calls: Stylua, Ruff, Prettierd, Prettier, Lua Language Server, Pyright and TypeScript Language Server. `gopls` and `rust-analyzer` join the list when a Go or Rust toolchain already exists.
 
-Existing `~/.config/nvim` gets timestamped before PSYCHOVIM moves in. Plugin and parser sync happens during setup with deliberately low network concurrency.
+System packages may require `sudo`. Neovim, tree-sitter, PSYCHOVIM, Mason tools and the launcher themselves stay under your user directories.
+
+Existing `~/.config/nvim` gets timestamped before PSYCHOVIM moves in. Network work runs with deliberately low concurrency.
 
 ## `pycho`
 
@@ -33,7 +35,7 @@ Existing `~/.config/nvim` gets timestamped before PSYCHOVIM moves in. Plugin and
 ```bash
 pycho                 # update check, then open Neovim
 pycho .               # same, open this project
-pycho update          # force config + plugin + parser update now
+pycho update          # force config + plugins + tools + parsers now
 pycho settings        # update check, then open Pycho Settings
 pycho status          # install / Git / auto-update state
 pycho doctor          # update check, then Morning Routine
@@ -43,24 +45,25 @@ pycho help
 
 ### Updates happen before launch
 
-By default every normal `pycho` launch checks all three lanes:
+By default every normal `pycho` launch does the maintenance pass before opening the editor:
 
 ```text
 PSYCHOVIM // CHECK
 config       current
 plugins      ok
+tools        ok
 parsers      ok
 ```
 
-Config updates are fast-forward only. If you actually edited the PSYCHOVIM checkout, the automatic config update leaves it alone instead of eating your work. Plugin or network trouble does not prevent Neovim from opening; logs go under `~/.cache/psychovim/`.
+Config updates are fast-forward only. If you actually edited the PSYCHOVIM checkout, the automatic config update leaves it alone instead of eating your work. Plugin/tool/parser or network trouble does not prevent Neovim from opening; logs go under `~/.cache/psychovim/`.
 
-All three automatic lanes can be switched off separately in Pycho Settings. For an emergency offline boot:
+There are three policy switches in Pycho Settings: config updates, plugin/toolchain updates and parser updates. For an emergency offline boot:
 
 ```bash
 PSYCHOVIM_NO_AUTOUPDATE=1 pycho
 ```
 
-Lazy also runs its own update checker on every Neovim launch by default. Its lockfile lives in Neovim state rather than the Git checkout, so plugin updates do not make the config repo dirty.
+Lazy also runs its own background update checker on interactive Neovim launches. Maintenance/headless runs disable that checker so it cannot race the explicit updater. Its lockfile lives in Neovim state rather than the Git checkout, so plugin updates do not make the config repo dirty.
 
 ### Old install?
 
@@ -130,6 +133,8 @@ These switches actually control the plugin specs after restart:
 - surround
 - which-key
 
+Mason's managed formatter/LSP binaries follow the LSP and formatter switches. Disabling both means the `tools` update lane has nothing to do.
+
 ### AUTOMATION
 
 - yank highlight
@@ -158,9 +163,9 @@ Turn one off and the native behavior is allowed through again.
 ### UPDATES
 
 - config update on launch
-- plugin update on launch
+- plugin + Mason toolchain update on launch
 - parser update on launch
-- Lazy background checker on every launch
+- Lazy background checker on interactive launches
 
 ## PychoClose
 
@@ -214,6 +219,7 @@ Checks Neovim, Git, curl, archive tools, ripgrep, compiler, Node/npm, tree-sitte
 
 - `lazy.nvim` — plugins, limited to two concurrent network jobs
 - native `vim.lsp` + `mason-org/mason.nvim` — language servers
+- `mason-tool-installer.nvim` — managed LSP/formatter binaries
 - `blink.cmp` — completion
 - `conform.nvim` — formatting
 - Telescope — finding things
@@ -223,7 +229,7 @@ Checks Neovim, Git, curl, archive tools, ripgrep, compiler, Node/npm, tree-sitte
 - Snacks — dashboard, picker and input UI
 - Catppuccin — syntax palette underneath PSYCHOVIM overrides
 
-Default LSP targets: `lua_ls`, `pyright`, `ts_ls`, `gopls`, `rust_analyzer`.
+Default LSP targets are Lua, Python and TypeScript. Go and Rust are enabled when their language toolchains exist.
 
 Formatter map: Lua -> `stylua`; Python -> `ruff_format`; JS/TS/JSON/Markdown -> `prettierd`, then `prettier`.
 
@@ -275,7 +281,7 @@ Inside Neovim:
 :PychoParsers
 ```
 
-Plugin logs live under `~/.cache/psychovim/`.
+Maintenance logs live under `~/.cache/psychovim/`.
 
 ## Repo
 
