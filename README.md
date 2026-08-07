@@ -6,13 +6,21 @@ PSYCHOVIM is not meant to be a red-and-black horror skin. It should look control
 
 ## Install
 
-Requirements: Neovim **0.12+**, Git, a C compiler, `curl`, `tar`. A Nerd Font and `ripgrep` are recommended.
+Requirements: Git, `curl`, `tar`, and a C compiler. A Nerd Font and `ripgrep` are recommended. **Neovim does not need to be preinstalled.**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/OnurByte/PSYCHOVIM/main/install.sh | bash
 ```
 
-The installer backs up an existing Neovim config, installs PSYCHOVIM to `${XDG_CONFIG_HOME:-~/.config}/nvim`, and creates the launcher:
+The installer:
+
+- uses an existing Neovim 0.12+ installation when available
+- automatically installs the latest official stable Neovim build on supported Linux/macOS x86_64 or arm64 systems when Neovim is missing or too old
+- installs managed Neovim files under `~/.local/share/psychovim/neovim` without `sudo`
+- exposes managed Neovim at `~/.local/bin/nvim` when possible
+- backs up an existing Neovim config
+- installs PSYCHOVIM to `${XDG_CONFIG_HOME:-~/.config}/nvim`
+- creates the `pycho` launcher
 
 ```bash
 pycho
@@ -223,7 +231,7 @@ If icons look wrong, use a Nerd Font. If live grep is unavailable, install `ripg
 
 ## CI
 
-Every push to `main` runs a GitHub Actions smoke test that installs stable Neovim, parses every Lua file, installs the plugin set, starts PSYCHOVIM headlessly, and verifies the custom Smart/Mask/Dorsia modules can load.
+Every push to `main` runs a GitHub Actions smoke test that validates the installer, installs stable Neovim, parses every Lua file, installs the plugin set, starts PSYCHOVIM headlessly, and verifies the custom Smart/Mask/Dorsia modules can load.
 
 ## Philosophy
 
