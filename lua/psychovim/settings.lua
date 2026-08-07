@@ -177,8 +177,8 @@ function M.open()
   vim.bo[state.buf].bufhidden = "wipe"
   vim.bo[state.buf].swapfile = false
 
-  local width = math.min(76, math.max(62, vim.o.columns - 8))
-  local height = #rows + 7
+  local width = math.max(40, math.min(76, vim.o.columns - 4))
+  local height = math.max(10, math.min(#rows + 7, vim.o.lines - 4))
   state.win = vim.api.nvim_open_win(state.buf, true, {
     relative = "editor",
     width = width,
