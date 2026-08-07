@@ -34,7 +34,7 @@ restore_backup() {
   if [[ -n "$BACKUP" && -e "$BACKUP" ]]; then
     rm -rf "$TARGET"
     mv "$BACKUP" "$TARGET"
-    say "${yellow}Previous Neovim config restored.${reset}"
+    say "${yellow}restored:${reset} $TARGET"
   fi
 }
 
@@ -60,13 +60,13 @@ detect_neovim_asset() {
   case "$os" in
     Linux) platform="linux" ;;
     Darwin) platform="macos" ;;
-    *) die "automatic Neovim installation currently supports Linux and macOS; detected: $os" ;;
+    *) die "automatic Neovim install supports Linux/macOS only; got: $os" ;;
   esac
 
   case "$arch" in
     x86_64|amd64) asset_arch="x86_64" ;;
     arm64|aarch64) asset_arch="arm64" ;;
-    *) die "automatic Neovim installation does not have an official binary mapping for architecture: $arch" ;;
+    *) die "no official Neovim binary mapping for architecture: $arch" ;;
   esac
 
   printf 'nvim-%s-%s' "$platform" "$asset_arch"
@@ -80,31 +80,30 @@ install_neovim() {
   TMP_DIR="$(mktemp -d 2>/dev/null || mktemp -d -t psychovim)"
   archive="$TMP_DIR/neovim.tar.gz"
 
-  say "Neovim 0.12+ was not found. Installing the latest official stable build..."
-  say "Target: ${bold}${NVIM_HOME}${reset}"
+  say "nvim 0.12+ not found; pulling stable"
+  say "target: ${bold}${NVIM_HOME}${reset}"
 
   curl -fL --retry 3 --connect-timeout 15 "$url" -o "$archive" \
-    || die "could not download the official Neovim archive."
+    || die "could not download Neovim"
 
   rm -rf "$NVIM_HOME"
   mkdir -p "$NVIM_HOME"
   tar -xzf "$archive" --strip-components=1 -C "$NVIM_HOME" \
-    || die "could not extract Neovim."
+    || die "could not extract Neovim"
 
   NVIM_EXEC="$NVIM_HOME/bin/nvim"
-  [[ -x "$NVIM_EXEC" ]] || die "Neovim archive was extracted but bin/nvim is missing."
-  nvim_is_supported "$NVIM_EXEC" || die "downloaded Neovim does not satisfy PSYCHOVIM's 0.12+ requirement."
+  [[ -x "$NVIM_EXEC" ]] || die "archive extracted without bin/nvim"
+  nvim_is_supported "$NVIM_EXEC" || die "downloaded Neovim is older than 0.12"
 
   mkdir -p "$BIN_DIR"
   if [[ ! -e "$NVIM_LINK" || -L "$NVIM_LINK" ]]; then
     ln -sfn "$NVIM_EXEC" "$NVIM_LINK"
-    say "Installed Neovim launcher: ${bold}${NVIM_LINK}${reset}"
+    say "link: ${bold}${NVIM_LINK}${reset}"
   else
-    say "${yellow}warning:${reset} ${NVIM_LINK} already exists and is not a symlink; leaving it untouched."
-    say "The ${bold}pycho${reset} launcher will still use the PSYCHOVIM-managed Neovim directly."
+    say "${yellow}warning:${reset} $NVIM_LINK exists and is not a symlink; leaving it alone"
   fi
 
-  say "Installed $($NVIM_EXEC --version | head -n 1)."
+  say "nvim: $($NVIM_EXEC --version | head -n 1)"
 }
 
 resolve_neovim() {
@@ -113,11 +112,11 @@ resolve_neovim() {
     existing="$(command -v nvim)"
     if nvim_is_supported "$existing"; then
       NVIM_EXEC="$existing"
-      say "Using $($NVIM_EXEC --version | head -n 1) from ${bold}${NVIM_EXEC}${reset}."
+      say "nvim: $($NVIM_EXEC --version | head -n 1) (${NVIM_EXEC})"
       return
     fi
 
-    say "${yellow}warning:${reset} $($existing --version | head -n 1) is older than PSYCHOVIM's Neovim 0.12 requirement."
+    say "${yellow}old nvim:${reset} $($existing --version | head -n 1)"
   fi
 
   install_neovim
@@ -150,12 +149,11 @@ ensure_launcher_path() {
         printf '\n# PSYCHOVIM launcher\n'
         printf '%s\n' "$export_line"
       } >> "$profile"
-      say "Added ${bold}${BIN_DIR}${reset} to PATH in ${bold}${profile}${reset}."
-      say "Open a new terminal (or source that file) before using ${bold}pycho${reset}."
+      say "path: added ${bold}${BIN_DIR}${reset} to ${bold}${profile}${reset}"
+      say "open a new shell before running ${bold}pycho${reset}"
     fi
   else
-    say "${yellow}warning:${reset} ${BIN_DIR} is not currently in PATH."
-    say "Add it to your shell PATH to run ${bold}pycho${reset} directly."
+    say "${yellow}warning:${reset} $BIN_DIR is not in PATH"
   fi
 }
 
@@ -175,50 +173,45 @@ if command -v nvim >/dev/null 2>&1; then
   exec nvim "$@"
 fi
 
-printf '%s\n' 'pycho: Neovim is not installed or not available.' >&2
+printf '%s\n' 'pycho: nvim not found' >&2
 exit 127
 EOF
   } > "$PYCHO_BIN"
 
   chmod 755 "$PYCHO_BIN"
-  say "Installed launcher: ${bold}${PYCHO_BIN}${reset}"
+  say "launcher: ${bold}${PYCHO_BIN}${reset}"
   ensure_launcher_path
 }
 
-say "${red}${bold}PSYCHOVIM${reset} — installation protocol"
+say "${red}${bold}PSYCHOVIM${reset} // SETUP"
 say ""
 
-command -v git >/dev/null 2>&1 || die "git is required. Install Git and run the installer again."
-command -v curl >/dev/null 2>&1 || die "curl is required."
-command -v tar >/dev/null 2>&1 || die "tar is required."
+command -v git >/dev/null 2>&1 || die "git is required"
+command -v curl >/dev/null 2>&1 || die "curl is required"
+command -v tar >/dev/null 2>&1 || die "tar is required"
 
 resolve_neovim
 
 if [[ -e "$TARGET" || -L "$TARGET" ]]; then
   BACKUP="${TARGET}.backup-${STAMP}"
-  say "Existing Neovim config found."
-  say "Backing it up to: ${bold}${BACKUP}${reset}"
+  say "config: $TARGET"
+  say "backup: ${bold}${BACKUP}${reset}"
   mv "$TARGET" "$BACKUP"
 fi
 
 mkdir -p "$(dirname "$TARGET")"
 
-say "Cloning PSYCHOVIM (${BRANCH}) into ${bold}${TARGET}${reset}..."
+say "clone: ${bold}${REPO_URL}${reset} -> ${bold}${TARGET}${reset} (${BRANCH})"
 if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TARGET"; then
   restore_backup
-  die "clone failed. No existing configuration was lost."
+  die "clone failed"
 fi
 
 install_launcher
 
 say ""
-say "${green}${bold}Installation complete.${reset}"
-say "Neovim: ${bold}${NVIM_EXEC}${reset}"
-say "Launch PSYCHOVIM with: ${bold}pycho${reset}"
-say "Open a file directly with: ${bold}pycho path/to/file${reset}"
-say "On first launch, lazy.nvim will bootstrap the plugin set."
+say "${green}${bold}done.${reset} run: ${bold}pycho${reset}"
+say "first launch: lazy.nvim will sync plugins"
 if [[ -n "$BACKUP" ]]; then
-  say "Previous config backup: ${bold}${BACKUP}${reset}"
+  say "old config: ${bold}${BACKUP}${reset}"
 fi
-say ""
-say "Ctrl+C / Ctrl+D → SmartClose"
