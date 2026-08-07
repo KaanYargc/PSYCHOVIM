@@ -5,20 +5,23 @@ function M.setup()
   local card = require("psychovim.business_card")
   local dorsia = require("psychovim.dorsia")
   local routine = require("psychovim.routine")
+  local settings = require("psychovim.settings")
 
   theme.setup()
   card.setup()
   dorsia.setup()
   routine.setup()
+  settings.setup()
   theme.apply(vim.g.psychovim_mask or "sanity")
 
   local map = vim.keymap.set
-  map("n", "<leader>pb", card.open, { desc = "PSYCHOVIM business card" })
-  map("n", "<leader>pm", theme.toggle, { desc = "Toggle Mask / After Hours" })
-  map("n", "<leader>pr", routine.open, { desc = "Morning Routine" })
-  map("n", "<leader>pd", dorsia.open, { desc = "Dorsia reservations" })
-  map("n", "<leader>ps", dorsia.save, { desc = "Save Dorsia reservation" })
-  map("n", "<leader>px", dorsia.forget, { desc = "Cancel Dorsia reservation" })
+  map("n", "<leader>pb", card.open, { desc = "Pycho Business Card" })
+  map("n", "<leader>pm", theme.toggle, { desc = "Pycho Mask" })
+  map("n", "<leader>pr", routine.open, { desc = "Pycho Morning Routine" })
+  map("n", "<leader>pd", dorsia.open, { desc = "Pycho Dorsia" })
+  map("n", "<leader>pS", dorsia.save, { desc = "Pycho Dorsia Save" })
+  map("n", "<leader>px", dorsia.forget, { desc = "Pycho Dorsia Forget" })
+  map("n", "<leader>ps", settings.open, { desc = "Pycho Settings" })
 end
 
 return M
