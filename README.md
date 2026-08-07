@@ -1,233 +1,181 @@
-# 🔪 PychoVim
+# PSYCHOVIM 🔪
 
-> *"Look at that subtle off-white coloring. The tasteful thickness of it. Oh my God, it even has a watermark."*
+A dark, opinionated Neovim distribution inspired by the obsessive visual style of *American Psycho* — rebuilt as a practical daily development environment instead of a theme-only config.
 
-An American Psycho themed Neovim configuration filled with psychopathic details. Bringing Patrick Bateman's obsessive perfectionism and dark aesthetic to your coding environment.
+> "I have to return some videotapes."
 
-## 🩸 Features
+## What changed in v1
 
-### Aesthetic Perfection
-- **Dark Theme**: Catppuccin Mocha (with blood red highlights)
-- **Obsessive Details**: Every pixel in its place
-- **Psychopath Icons**: 🔪 💀 🩸 ⚠️ 💥
-- **Perfect Symmetry**: Auto-pairs and indent guides
+PSYCHOVIM now targets modern Neovim and includes:
 
-### Stalking Tools
-- **Telescope**: Find and track victims
-- **NvimTree**: Map the territory
-- **Gitsigns**: Track the evidence
-- **Todo Comments**: KILL, VICTIM, HIDE tags
+- `lazy.nvim` plugin management
+- Neovim 0.12 native LSP configuration
+- Mason-managed language servers
+- Blink completion
+- format-on-save with Conform
+- Telescope fuzzy finding
+- nvim-tree file navigation
+- current nvim-treesitter API
+- Git signs and diagnostics
+- which-key discovery
+- Catppuccin Mocha with the PSYCHOVIM black/red palette
+- a custom Snacks dashboard
+- modular options, keymaps, autocmds, and plugin configuration
 
-### Psychological Features
-- **Random Messages**: A different Patrick Bateman quote on each startup
-- **Smooth Scrolling**: Elegant and calculated movements
-- **Undo Persistence**: Never forget anything
-- **Auto-cleanup**: Obsessive cleaning (trailing whitespace)
+## Requirements
 
-## 📦 Installation
+- Neovim **0.12+**
+- Git
+- a C compiler (required by Treesitter parsers)
+- `curl` and `tar`
+- a Nerd Font is recommended for icons
+- `ripgrep` is recommended for Telescope live grep
 
-### 1. Clone the repository
+## Installation
 
-```bash
-git clone https://github.com/KaanYargc/PSYCHOVIM.git ~/.config/nvim
-```
-
-### 2. Remove the .git folder (so you can add it to your own repo later)
-
-```bash
-rm -rf ~/.config/nvim/.git
-```
-
-### 3. Install Packer
+Back up an existing Neovim config first:
 
 ```bash
-git clone --depth 1 https://github.com/wbthomason/packer.nvim\
- ~/.local/share/nvim/site/pack/packer/start/packer.nvim
+mv ~/.config/nvim ~/.config/nvim.backup
 ```
 
-### 4. Install Plugins
+Clone PSYCHOVIM:
 
-Open Neovim and run:
+```bash
+git clone https://github.com/OnurByte/PSYCHOVIM.git ~/.config/nvim
+```
+
+Start Neovim:
+
+```bash
+nvim
+```
+
+`lazy.nvim` bootstraps itself on first launch. Treesitter parsers and configured LSP servers are then installed through their respective managers.
+
+## Default language servers
+
+Mason is configured to install:
+
+- `lua_ls`
+- `pyright`
+- `ts_ls`
+- `gopls`
+- `rust_analyzer`
+
+Open `:Mason` to install or remove additional tooling.
+
+## Completion and formatting
+
+Completion is provided by `blink.cmp` using LSP, path, snippets, and buffer sources.
+
+Formatting is handled by Conform. The default formatter map includes:
+
+- Lua → `stylua`
+- Python → `ruff_format`
+- JavaScript / TypeScript / JSON / Markdown → `prettierd`, falling back to `prettier`
+
+Use `<leader>cf` to format manually.
+
+If a formatter executable is not installed, install it with your system package manager or Mason where supported.
+
+## Keybindings
+
+Leader is `Space`.
+
+| Key | Action |
+| --- | --- |
+| `<leader>ff` | Find files |
+| `<leader>fg` | Live grep |
+| `<leader>fb` | Buffers |
+| `<leader>fr` | Recent files |
+| `<leader>e` | Toggle file explorer |
+| `<leader>o` | Focus file explorer |
+| `<leader>cf` | Format file |
+| `<leader>ca` | LSP code action |
+| `<leader>rn` | LSP rename |
+| `gd` | Go to definition |
+| `gr` | Find references |
+| `K` | Hover documentation |
+| `[d` / `]d` | Previous / next diagnostic |
+| `<leader>dd` | Diagnostic popup |
+| `<leader>bd` | Delete buffer |
+| `<Tab>` / `<S-Tab>` | Next / previous buffer |
+| `<C-h/j/k/l>` | Navigate windows |
+| `<leader>sv` | Vertical split |
+| `<leader>sh` | Horizontal split |
+| `<leader>tt` | Terminal |
+| `jk` / `kj` | Leave insert mode |
+
+Run `:Lazy` to inspect plugins and `:checkhealth` to diagnose your local setup.
+
+## Structure
+
+```text
+.
+├── init.lua
+└── lua
+    ├── plugins.lua
+    └── psychovim
+        ├── autocmds.lua
+        ├── keymaps.lua
+        ├── lazy.lua
+        └── options.lua
+```
+
+The project intentionally keeps the distribution small enough to understand. Core behavior lives under `lua/psychovim/`; plugin specifications live in `lua/plugins.lua`.
+
+## Philosophy
+
+PSYCHOVIM should feel distinctive without sabotaging normal editor behavior. Theme jokes stay in presentation; destructive or surprising keybindings do not.
+
+The old configuration used Packer and committed generated `packer_compiled.lua` output. v1 removes that artifact and moves dependency management to `lazy.nvim`.
+
+## Troubleshooting
+
+### Plugins fail to install
+
+Check that `git` is available, then run:
 
 ```vim
-:PackerSync
+:Lazy sync
 ```
 
-### 5. Update Treesitter
+### LSP is not running
+
+Run:
+
+```vim
+:Mason
+:checkhealth vim.lsp
+```
+
+### Treesitter parser errors
+
+Run:
 
 ```vim
 :TSUpdate
+:checkhealth vim.treesitter
 ```
 
-## 🎯 Keybindings
+### Icons look broken
 
-### Basic Operations
-| Keybinding | Description |
-|---------|----------|
-| `Space` | Leader key |
-| `jk` / `kj` | Exit insert mode |
-| `Ctrl+c` | Quick exit from insert mode |
-| `<leader>w` | Save (hide the body) |
-| `<leader>q` | Quit (leave no trace) |
-| `<leader>Q` | Close all (burn everything) |
+Use a Nerd Font in your terminal emulator.
 
-### Buffer Management (Victim Selection)
-| Keybinding | Description |
-|---------|----------|
-| `<leader>bd` | Delete buffer (eliminate) |
-| `Tab` | Next buffer (next victim) |
-| `Shift+Tab` | Previous buffer (previous victim) |
+## Roadmap
 
-### Window Management (Kill Room)
-| Keybinding | Description |
-|---------|----------|
-| `Ctrl+h/j/k/l` | Navigate between windows |
-| `<leader>sv` | Split vertically (vertical dissection) |
-| `<leader>sh` | Split horizontally (horizontal dissection) |
-| `<leader>sx` | Close window |
+Next useful additions:
 
-### Telescope (Stalking Tools)
-| Keybinding | Description |
-|---------|----------|
-| `<leader>ff` | Find files (hunt) |
-| `<leader>fg` | Search text (search for clues) |
-| `<leader>fb` | Buffer list (victim list) |
-| `<leader>fr` | Recent files (past crimes) |
+- first-class DAP/debugging profiles
+- integrated test runner
+- project-local formatter/LSP overrides
+- startup performance budget and benchmark command
+- install smoke test in GitHub Actions
+- optional minimal / full profiles
 
-### File Tree
-| Keybinding | Description |
-|---------|----------|
-| `<leader>e` | Toggle file tree |
-| `<leader>o` | Focus on file tree |
+## License
 
-## 🎨 Changing Theme
+MIT.
 
-Default theme is Catppuccin Mocha, but there are other options:
-
-```vim
-:colorscheme tokyonight
-:colorscheme nightfox
-:colorscheme rose-pine
-```
-
-## 🔧 Customization
-
-### Add Your Own Messages
-
-Edit the `messages` table in `init.lua`:
-
-```lua
-local messages = {
-    "Your own psychopathic message...",
-    "Another dark quote...",
-}
-```
-
-### Change Colors
-
-Edit Catppuccin settings in `lua/plugins.lua`:
-
-```lua
-color_overrides = {
-    mocha = {
-        base = "#0d0d0d",      -- Background
-        red = "#8b0000",       -- Blood red
-        -- Other colors...
-    },
-},
-```
-
-## 📚 Plugin List
-
-- **catppuccin/nvim** - Main theme (dark and sophisticated)
-- **nvim-lualine/lualine.nvim** - Status line (business card quality)
-- **akinsho/bufferline.nvim** - Buffer tabs (victim tabs)
-- **goolord/alpha-nvim** - Dashboard (welcome to hell)
-- **nvim-telescope/telescope.nvim** - Fuzzy finder (surveillance)
-- **nvim-tree/nvim-tree.lua** - File explorer (territory map)
-- **nvim-treesitter/nvim-treesitter** - Syntax highlighting (forensics)
-- **lewis6991/gitsigns.nvim** - Git integration (track evidence)
-- **folke/which-key.nvim** - Keybinding helper (memory aid)
-- **folke/todo-comments.nvim** - Todo highlighting (obsessive notes)
-- **rcarriga/nvim-notify** - Notifications (intrusive thoughts)
-- **windwp/nvim-autopairs** - Auto pairs (perfect symmetry)
-- **numToStr/Comment.nvim** - Comments (inner monologue)
-- **kylechui/nvim-surround** - Surround text (wrap victims)
-- **karb94/neoscroll.nvim** - Smooth scrolling (elegant movements)
-- **norcalli/nvim-colorizer.lua** - Color highlighter (blood detection)
-- **lukas-reineke/indent-blankline.nvim** - Indent guides (OCD lines)
-
-## 🎬 Screenshots
-
-The dashboard greets you with:
-
-```
-  ██████╗ ██╗   ██╗ ██████╗██╗  ██╗ ██████╗ ██╗   ██╗██╗███╗   ███╗
-  ██╔══██╗╚██╗ ██╔╝██╔════╝██║  ██║██╔═══██╗██║   ██║██║████╗ ████║
-  ██████╔╝ ╚████╔╝ ██║     ███████║██║   ██║██║   ██║██║██╔████╔██║
-  ██╔═══╝   ╚██╔╝  ██║     ██╔══██║██║   ██║╚██╗ ██╔╝██║██║╚██╔╝██║
-  ██║        ██║   ╚██████╗██║  ██║╚██████╔╝ ╚████╔╝ ██║██║ ╚═╝ ██║
-  ╚═╝        ╚═╝    ╚═════╝╚═╝  ╚═╝ ╚═════╝   ╚═══╝  ╚═╝╚═╝     ╚═╝
-
-           🔪 I have to return some videotapes 🔪
-
-Let's see Paul Allen's config...
-```
-
-## 💀 Todo Tags
-
-You can use special tags in your code:
-
-```lua
--- KILL: Destroy this function
--- VICTIM: This variable is a target
--- HIDE: Hide this code
--- TODO: Normal todo
--- HACK: Dirty work
--- WARN: Warning
--- PERF: Performance
--- NOTE: Note
-```
-
-## 🩺 Troubleshooting
-
-### Plugins not loading
-```vim
-:PackerSync
-:PackerCompile
-```
-
-### Treesitter errors
-```vim
-:TSUpdate
-:TSInstall lua vim python javascript
-```
-
-### Theme not loading
-```vim
-:PackerSync
-:colorscheme catppuccin
-```
-
-## 🎭 Quotes
-
-You'll see a random Patrick Bateman quote on each Neovim startup:
-
-- "Let's see Paul Allen's config..."
-- "I have to return some videotapes"
-- "Try getting a reservation at Dorsia now!"
-- "I'm into murders and executions mostly"
-- "Do you like Huey Lewis and the News?"
-- And more...
-
-## 📝 License
-
-MIT - But Patrick Bateman didn't approve.
-
-## 🔪 Warning
-
-This configuration is purely for entertainment purposes. It contains no real violence, just a dark aesthetic inspired by the American Psycho movie. Have fun coding!
-
----
-
-*"I think my mask of sanity is about to slip."*
+PSYCHOVIM is an unofficial fan-made configuration and is not affiliated with the creators or rights holders of *American Psycho*.
