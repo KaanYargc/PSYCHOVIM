@@ -43,7 +43,7 @@ require("lazy").setup({
   checker = {
     enabled = not maintenance and settings.get("plugin_update_check") == true,
     notify = false,
-    frequency = 0,
+    frequency = 3600,
     concurrency = 1,
   },
   change_detection = { notify = false },
