@@ -28,6 +28,20 @@ local function modified_count()
   return count
 end
 
+local function has_project_context()
+  if vim.fn.argc() > 0 then return true end
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.api.nvim_buf_is_valid(buf)
+      and vim.bo[buf].buflisted
+      and vim.bo[buf].buftype == ""
+      and vim.api.nvim_buf_get_name(buf) ~= ""
+    then
+      return true
+    end
+  end
+  return false
+end
+
 function M.save(opts)
   opts = opts or {}
   ensure_dir()
@@ -110,7 +124,7 @@ function M.setup()
   vim.api.nvim_create_autocmd("VimLeavePre", {
     group = group,
     callback = function()
-      if vim.fn.argc() > 0 or #vim.api.nvim_list_wins() > 0 then
+      if has_project_context() then
         pcall(M.save, { quiet = true })
       end
     end,
