@@ -3,6 +3,19 @@ local map = vim.keymap.set
 map("i", "jk", "<Esc>", { desc = "Exit insert mode" })
 map("i", "kj", "<Esc>", { desc = "Exit insert mode" })
 
+-- Signature PSYCHOVIM escape hatch: save everything and disappear.
+-- Deliberately overrides the usual Ctrl-C / Ctrl-D behavior in normal,
+-- insert and visual modes so new users always have an obvious way out.
+local function save_all_and_quit()
+  vim.cmd("wall")
+  vim.cmd("qall")
+end
+
+for _, mode in ipairs({ "n", "i", "v" }) do
+  map(mode, "<C-c>", save_all_and_quit, { desc = "Save all & exit" })
+  map(mode, "<C-d>", save_all_and_quit, { desc = "Save all & exit" })
+end
+
 map("n", "<leader>w", "<cmd>write<cr>", { desc = "Write file" })
 map("n", "<leader>q", "<cmd>quit<cr>", { desc = "Quit window" })
 map("n", "<leader>Q", "<cmd>qa!<cr>", { desc = "Quit all without saving" })
