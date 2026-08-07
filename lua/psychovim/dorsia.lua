@@ -48,11 +48,11 @@ function M.save(opts)
   local path = session_path()
   local ok, err = pcall(vim.cmd, "silent mksession! " .. vim.fn.fnameescape(path))
   if not ok then
-    if not opts.quiet then notify("Reservation failed: " .. tostring(err), vim.log.levels.ERROR) end
+    if not opts.quiet then notify("reservation failed: " .. tostring(err), vim.log.levels.ERROR) end
     return false
   end
   if not opts.quiet then
-    notify("Reservation confirmed for " .. vim.fn.fnamemodify(vim.fn.getcwd(), ":t") .. ".")
+    notify("reserved: " .. vim.fn.fnamemodify(vim.fn.getcwd(), ":t"))
   end
   return true
 end
@@ -73,28 +73,29 @@ local function display_name(path)
 end
 
 local function load(path)
-  if modified_count() > 0 then
-    notify("Reservation denied: unsaved buffers are still at the table. Save or SmartClose them first.", vim.log.levels.WARN)
+  local dirty = modified_count()
+  if dirty > 0 then
+    notify(string.format("no table. %d dirty buffer%s.", dirty, dirty == 1 and "" or "s"), vim.log.levels.WARN)
     return
   end
 
   local ok, err = pcall(vim.cmd, "silent source " .. vim.fn.fnameescape(path))
   if not ok then
-    notify("Could not seat this reservation: " .. tostring(err), vim.log.levels.ERROR)
+    notify("reservation lost: " .. tostring(err), vim.log.levels.ERROR)
     return
   end
-  notify("Reservation seated.")
+  notify("table ready")
 end
 
 function M.open()
   local sessions = list_sessions()
   if #sessions == 0 then
-    notify("No reservation found. Use :DorsiaSave inside a project first.", vim.log.levels.WARN)
+    notify("no reservations. :DorsiaSave first.", vim.log.levels.WARN)
     return
   end
 
   vim.ui.select(sessions, {
-    prompt = "Dorsia — select reservation",
+    prompt = "Dorsia",
     format_item = display_name,
   }, function(choice)
     if choice then load(choice) end
@@ -104,14 +105,14 @@ end
 function M.forget()
   local path = session_path()
   if vim.fn.filereadable(path) == 0 then
-    notify("There is no reservation for this project.", vim.log.levels.WARN)
+    notify("nothing booked here", vim.log.levels.WARN)
     return
   end
   local ok = vim.fn.delete(path) == 0
   if ok then
-    notify("Reservation cancelled.")
+    notify("cancelled")
   else
-    notify("Reservation could not be cancelled.", vim.log.levels.ERROR)
+    notify("cancellation failed", vim.log.levels.ERROR)
   end
 end
 
