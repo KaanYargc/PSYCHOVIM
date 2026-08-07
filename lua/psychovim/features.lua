@@ -11,7 +11,6 @@ function M.setup()
   card.setup()
   dorsia.setup()
   routine.setup()
-  settings.setup()
   theme.apply(vim.g.psychovim_mask or "sanity")
 
   local map = vim.keymap.set
