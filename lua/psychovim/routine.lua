@@ -39,8 +39,9 @@ function M.open()
     return
   end
 
+  local settings = require("psychovim.settings")
   local loaded, total = lazy_stats()
-  local width = math.min(64, math.max(52, vim.o.columns - 10))
+  local width = math.min(68, math.max(52, vim.o.columns - 10))
   local nvim_version = vim.version()
   local mask = vim.g.psychovim_mask == "after_hours" and "AFTER HOURS" or "ON"
 
@@ -51,9 +52,14 @@ function M.open()
     "",
     row("Neovim", string.format("%d.%d.%d", nvim_version.major, nvim_version.minor, nvim_version.patch), width - 4),
     row("Git", yesno(vim.fn.executable("git") == 1), width - 4),
+    row("curl", yesno(vim.fn.executable("curl") == 1), width - 4),
+    row("tar / gzip / unzip", yesno(vim.fn.executable("tar") == 1 and vim.fn.executable("gzip") == 1 and vim.fn.executable("unzip") == 1), width - 4),
     row("Ripgrep", yesno(vim.fn.executable("rg") == 1), width - 4),
     row("C compiler", yesno(compiler_available()), width - 4),
+    row("Node / npm", yesno(vim.fn.executable("node") == 1 and vim.fn.executable("npm") == 1), width - 4),
+    row("tree-sitter CLI", yesno(vim.fn.executable("tree-sitter") == 1), width - 4),
     row("Plugins", string.format("%d / %d", loaded, total), width - 4),
+    row("Auto update", settings.get("auto_update_config") and "ON" or "OFF", width - 4),
     row("Mask", mask, width - 4),
     "",
     "  Good. Get to work.",
@@ -75,7 +81,7 @@ function M.open()
     row = math.max(0, math.floor((vim.o.lines - height) / 2) - 1),
     col = math.max(0, math.floor((vim.o.columns - width) / 2)),
     style = "minimal",
-    border = "rounded",
+    border = settings.get("popup_border") or "rounded",
     title = " Morning Routine ",
     title_pos = "center",
     noautocmd = true,
@@ -84,7 +90,7 @@ function M.open()
   vim.wo[state.win].winhl = "Normal:NormalFloat,FloatBorder:PsychovimCardTitle"
   vim.api.nvim_buf_add_highlight(state.buf, -1, "PsychovimCardTitle", 1, 2, -1)
   vim.api.nvim_buf_add_highlight(state.buf, -1, "PsychovimMuted", 2, 2, -1)
-  vim.api.nvim_buf_add_highlight(state.buf, -1, "PsychovimMuted", 11, 2, -1)
+  vim.api.nvim_buf_add_highlight(state.buf, -1, "PsychovimMuted", #lines - 3, 2, -1)
 
   local opts = { buffer = state.buf, silent = true, nowait = true }
   vim.keymap.set("n", "q", close, opts)
