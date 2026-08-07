@@ -4,13 +4,16 @@ set -Eeuo pipefail
 REPO_URL="https://github.com/OnurByte/PSYCHOVIM.git"
 BRANCH="${PSYCHOVIM_BRANCH:-main}"
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 TARGET="${PSYCHOVIM_DIR:-$CONFIG_HOME/nvim}"
 BIN_DIR="${PSYCHOVIM_BIN_DIR:-$HOME/.local/bin}"
-NVIM_HOME="${PSYCHOVIM_NVIM_DIR:-$HOME/.local/share/psychovim/neovim}"
+NVIM_HOME="${PSYCHOVIM_NVIM_DIR:-$DATA_HOME/psychovim/neovim}"
 NVIM_LINK="$BIN_DIR/nvim"
 PYCHO_BIN="$BIN_DIR/pycho"
+LAZY_ROOT="$DATA_HOME/nvim/lazy"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psychovim"
 SYNC_LOG="$CACHE_DIR/lazy-sync.log"
+PARSER_LOG="$CACHE_DIR/parser-sync.log"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 BACKUP=""
 NVIM_EXEC=""
@@ -185,12 +188,32 @@ EOF
   ensure_launcher_path
 }
 
+repair_plugin_checkout() {
+  local name="$1"
+  local dir="$LAZY_ROOT/$name"
+  local dirty backup
+
+  [[ -d "$dir/.git" ]] || return 0
+  dirty="$(git -C "$dir" status --porcelain 2>/dev/null || true)"
+  [[ -n "$dirty" ]] || return 0
+
+  mkdir -p "$CACHE_DIR/dirty-plugins"
+  backup="$CACHE_DIR/dirty-plugins/${name}-${STAMP}"
+  mv "$dir" "$backup"
+  say "plugins: reset dirty $name"
+  say "backup: ${bold}${backup}${reset}"
+}
+
 sync_plugins() {
   local attempt
   mkdir -p "$CACHE_DIR"
   : > "$SYNC_LOG"
 
-  say "plugins: syncing"
+  # This checkout has historically been modified by older LSP tooling. Lazy
+  # correctly refuses to overwrite local changes, so preserve and reinstall it.
+  repair_plugin_checkout "nvim-lspconfig"
+
+  say "plugins: syncing (2 jobs max)"
   for attempt in 1 2 3; do
     if "$NVIM_EXEC" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then
       say "plugins: ${green}ok${reset}"
@@ -199,13 +222,47 @@ sync_plugins() {
 
     say "${yellow}plugins:${reset} sync failed ($attempt/3)"
     if (( attempt < 3 )); then
-      sleep $(( attempt * 2 ))
+      sleep $(( attempt * 3 ))
     fi
   done
 
-  say "${yellow}plugins:${reset} install incomplete; network probably dropped"
+  say "${yellow}plugins:${reset} install incomplete"
   say "log: ${bold}${SYNC_LOG}${reset}"
   say "retry: ${bold}pycho --headless '+Lazy! sync' '+qa'${reset}"
+  return 0
+}
+
+sync_parsers() {
+  local attempt
+  local languages=(bash c cpp go javascript json lua markdown python rust toml tsx typescript vim vimdoc yaml)
+
+  mkdir -p "$CACHE_DIR"
+  : > "$PARSER_LOG"
+
+  if ! command -v tree-sitter >/dev/null 2>&1; then
+    say "${yellow}parsers:${reset} tree-sitter CLI missing; skipping parser bootstrap"
+    say "install tree-sitter-cli 0.26+ and run: ${bold}:PsychoParsers${reset}"
+    return 0
+  fi
+
+  say "parsers: syncing serially"
+  for attempt in 1 2 3; do
+    if "$NVIM_EXEC" --headless \
+      "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" \
+      "+qa" >>"$PARSER_LOG" 2>&1; then
+      say "parsers: ${green}ok${reset}"
+      return 0
+    fi
+
+    say "${yellow}parsers:${reset} sync failed ($attempt/3)"
+    if (( attempt < 3 )); then
+      sleep $(( attempt * 3 ))
+    fi
+  done
+
+  say "${yellow}parsers:${reset} incomplete"
+  say "log: ${bold}${PARSER_LOG}${reset}"
+  say "retry in Neovim: ${bold}:PsychoParsers${reset}"
   return 0
 }
 
@@ -235,6 +292,7 @@ fi
 
 install_launcher
 sync_plugins
+sync_parsers
 
 say ""
 say "${green}${bold}done.${reset} run: ${bold}pycho${reset}"
