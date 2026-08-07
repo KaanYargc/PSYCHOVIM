@@ -22,7 +22,7 @@ The installer handles more than the config. On supported Linux package managers 
 
 Neovim 0.12+ does not need to exist beforehand. If it is missing or too old, PSYCHOVIM pulls the official stable build into `~/.local/share/psychovim/neovim`. The tree-sitter CLI is also installed from its official release binary into the user account.
 
-After the plugins land, Mason installs the editor tools the config actually calls: Stylua, Ruff, Prettierd, Prettier, Lua Language Server, Pyright and TypeScript Language Server. `gopls` and `rust-analyzer` join the list when a Go or Rust toolchain already exists.
+After the plugins land, Mason installs the editor tools the config actually calls: Stylua, Ruff, Prettierd, Prettier, ESLint_d, Lua Language Server, Pyright and TypeScript Language Server. `gopls` and `rust-analyzer` join the list when the matching Go or Rust toolchain already exists.
 
 System packages may require `sudo`. Neovim, tree-sitter, PSYCHOVIM, Mason tools and the launcher themselves stay under your user directories.
 
@@ -121,8 +121,15 @@ These switches actually control the plugin specs after restart:
 
 - `blink.cmp` completion
 - native LSP + Mason
+- Lua LSP
+- Python LSP
+- TypeScript / JavaScript LSP
+- Go LSP
+- Rust LSP
 - Conform formatter engine
 - format on save
+- nvim-lint linter engine
+- lint on save
 - Treesitter
 - Telescope
 - file tree
@@ -133,7 +140,9 @@ These switches actually control the plugin specs after restart:
 - surround
 - which-key
 
-Mason's managed formatter/LSP binaries follow the LSP and formatter switches. Disabling both means the `tools` update lane has nothing to do.
+Python linting uses Ruff. JavaScript/TypeScript linting uses `eslint_d`, but only when PSYCHOVIM finds an ESLint config above the current file; it does not invent an ESLint project for you. Manual lint is `<leader>cl`.
+
+Mason's managed formatter/LSP/linter binaries follow these switches. Go and Rust server installs are conditional on a matching language runtime existing on the machine.
 
 ### AUTOMATION
 
@@ -141,6 +150,14 @@ Mason's managed formatter/LSP binaries follow the LSP and formatter switches. Di
 - trim trailing whitespace on save
 - restore last cursor position
 - optional startup deadpan
+
+### TERMINAL
+
+- terminal line numbers
+- terminal sign column
+- start terminal in insert mode
+
+The `Terminal Esc exits insert` behavior remains a Pycho patch because it changes a key rather than a window option.
 
 ### PYCHO PATCHES
 
@@ -219,9 +236,10 @@ Checks Neovim, Git, curl, archive tools, ripgrep, compiler, Node/npm, tree-sitte
 
 - `lazy.nvim` — plugins, limited to two concurrent network jobs
 - native `vim.lsp` + `mason-org/mason.nvim` — language servers
-- `mason-tool-installer.nvim` — managed LSP/formatter binaries
+- `mason-tool-installer.nvim` — managed LSP/formatter/linter binaries
 - `blink.cmp` — completion
 - `conform.nvim` — formatting
+- `nvim-lint` — linting
 - Telescope — finding things
 - nvim-tree — files
 - nvim-treesitter — parsing/highlighting
@@ -229,7 +247,7 @@ Checks Neovim, Git, curl, archive tools, ripgrep, compiler, Node/npm, tree-sitte
 - Snacks — dashboard, picker and input UI
 - Catppuccin — syntax palette underneath PSYCHOVIM overrides
 
-Default LSP targets are Lua, Python and TypeScript. Go and Rust are enabled when their language toolchains exist.
+Default LSP targets are Lua, Python and TypeScript. Go and Rust are enabled when their language toolchains exist and their Settings switches remain on.
 
 Formatter map: Lua -> `stylua`; Python -> `ruff_format`; JS/TS/JSON/Markdown -> `prettierd`, then `prettier`.
 
@@ -252,6 +270,7 @@ Leader is `Space`.
 | `<leader>fr` | Recent files |
 | `<leader>e` | File tree |
 | `<leader>cf` | Format |
+| `<leader>cl` | Lint current file |
 | `<leader>ca` | Code action |
 | `<leader>rn` | Rename symbol |
 | `gd` | Definition |
