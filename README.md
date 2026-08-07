@@ -1,8 +1,8 @@
 # PSYCHOVIM
 
-Neovim with a Pierce & Pierce dress code and fewer stupid exits.
+Neovim with a Pierce & Pierce dress code and fewer stupid defaults.
 
-It is *American Psycho* themed, but it is still an editor. No blood-drip ASCII art. No lore dump. The surface stays clean; the bad decisions are configurable.
+The theme is *American Psycho*. The editor is still supposed to work. No blood-drip ASCII art, no lore dump, no pretending a broken keymap is atmosphere.
 
 ## Install
 
@@ -18,30 +18,49 @@ pycho .
 pycho main.go
 ```
 
-Git, `curl`, `tar`, and a C compiler are required. `ripgrep` and a Nerd Font are worth having.
+The installer handles more than the config. On supported Linux package managers (`apt`, `dnf`, `pacman`, `zypper`, `apk`) it installs missing Git/archive tools, ripgrep, a compiler toolchain, Node/npm and related runtime dependencies. Homebrew is used on macOS when available.
 
-Neovim itself is optional. If there is no usable Neovim 0.12+, the installer puts the official stable build under `~/.local/share/psychovim/neovim`. No `sudo` and no package-manager surgery.
+Neovim 0.12+ does not need to exist beforehand. If it is missing or too old, PSYCHOVIM pulls the official stable build into `~/.local/share/psychovim/neovim`. The tree-sitter CLI is also installed from its official release binary into the user account.
 
-Existing `~/.config/nvim` is timestamped before PSYCHOVIM moves in. Plugin sync happens during setup with low concurrency because some Wi-Fi connections apparently consider TLS a suggestion.
+System packages may require `sudo`. Neovim, tree-sitter, PSYCHOVIM and the launcher themselves stay under your home directory.
+
+Existing `~/.config/nvim` gets timestamped before PSYCHOVIM moves in. Plugin and parser sync happens during setup with deliberately low network concurrency.
 
 ## `pycho`
 
-`pycho` is the launcher and the maintenance command.
+`pycho` is both the launcher and the maintenance command.
 
 ```bash
-pycho                 # open Neovim
-pycho .               # open a project
-pycho update          # config + plugins + Treesitter parsers
-pycho settings        # boot directly into the settings panel
-pycho status          # branch / commit / Neovim version
-pycho doctor          # Morning Routine
+pycho                 # update check, then open Neovim
+pycho .               # same, open this project
+pycho update          # force config + plugin + parser update now
+pycho settings        # update check, then open Pycho Settings
+pycho status          # install / Git / auto-update state
+pycho doctor          # update check, then Morning Routine
 pycho parsers         # parser sync only
 pycho help
 ```
 
-`pycho update` only fast-forwards the PSYCHOVIM checkout. If you edited the config itself, it stops instead of eating your changes. Dirty managed plugin checkouts are moved into `~/.cache/psychovim/dirty-plugins/` before reinstalling.
+### Updates happen before launch
 
-Settings live outside the Git checkout in Neovim's state directory, so an update does not reset them.
+By default every normal `pycho` launch checks all three lanes:
+
+```text
+PSYCHOVIM // CHECK
+config       current
+plugins      ok
+parsers      ok
+```
+
+Config updates are fast-forward only. If you actually edited the PSYCHOVIM checkout, the automatic config update leaves it alone instead of eating your work. Plugin or network trouble does not prevent Neovim from opening; logs go under `~/.cache/psychovim/`.
+
+All three automatic lanes can be switched off separately in Pycho Settings. For an emergency offline boot:
+
+```bash
+PSYCHOVIM_NO_AUTOUPDATE=1 pycho
+```
+
+Lazy also runs its own update checker on every Neovim launch by default. Its lockfile lives in Neovim state rather than the Git checkout, so plugin updates do not make the config repo dirty.
 
 ### Old install?
 
@@ -52,11 +71,75 @@ git -C ~/.config/nvim pull --ff-only
 bash ~/.config/nvim/install.sh --launcher-only
 ```
 
-After that, `pycho update` handles it.
+After that, `pycho update` updates the updater too.
 
-## Pycho patches
+## Pycho Settings
 
-These are defaults, not commandments. Open them with `pycho settings`, `:PychoSettings`, or `<leader>ps`.
+```bash
+pycho settings
+```
+
+or inside Neovim:
+
+```vim
+:PychoSettings
+```
+
+`<leader>ps` opens the same panel.
+
+It is a scrollable workstation control panel, not a fake preferences screen. `j/k` or arrows move, `Enter`/`Space` changes a value, `r` resets defaults, `q`/`Esc` leaves. Settings are written immediately to Neovim state and survive `pycho update`.
+
+### EDITOR
+
+- line numbers and relative numbers
+- tab/indent width: 2 / 4 / 8
+- spaces vs tabs
+- line wrap
+- mouse
+- system clipboard
+- persistent undo
+- smart-case search
+- scroll margin
+
+### UI
+
+- **SANITY / AFTER HOURS** palette
+- cursor line
+- invisible characters
+- global popup border: rounded / single / double / bold
+- notification UI
+- diagnostics and diagnostic virtual text
+- statusline
+- buffer tabs
+
+### TOOLING
+
+These switches actually control the plugin specs after restart:
+
+- `blink.cmp` completion
+- native LSP + Mason
+- Conform formatter engine
+- format on save
+- Treesitter
+- Telescope
+- file tree
+- GitSigns
+- indent guides
+- TODO comments
+- autopairs
+- surround
+- which-key
+
+### AUTOMATION
+
+- yank highlight
+- trim trailing whitespace on save
+- restore last cursor position
+- optional startup deadpan
+
+### PYCHO PATCHES
+
+The opinionated fixes are settings too:
 
 | Patch | Default |
 | --- | --- |
@@ -68,32 +151,20 @@ These are defaults, not commandments. Open them with `pycho settings`, `:PychoSe
 | dirty-exit confirmation | ON |
 | terminal `Esc` leaves terminal insert mode | ON |
 
-Turn one off and the corresponding native Vim behavior is allowed through again.
+Turn one off and the native behavior is allowed through again.
 
-`<leader>bd` is **PychoBufferClose**: clean buffers close immediately; dirty buffers get save / discard / cancel.
+`<leader>bd` is **PychoBufferClose**: clean buffers close immediately; dirty buffers get save / discard / cancel. `<leader>Q` always opens PychoClose.
 
-`<leader>Q` always opens PychoClose even if the `Ctrl+C/D` patch is disabled.
+### UPDATES
 
-## Pycho Settings
-
-The settings panel is deliberately closer to an old workstation utility than a plugin menu.
-
-```vim
-:PychoSettings
-```
-
-It contains two groups:
-
-- **WORKSTATION** — Mask, format-on-save, relative numbers, diagnostics, cursor line, plugin update checker.
-- **PYCHO PATCHES** — the opinionated Vim fixes listed above.
-
-Use `j/k` or arrows, `Enter`/`Space` to change a value, `r` to restore defaults, `q`/`Esc` to leave. Changes are written immediately.
-
-The normal palette is **SANITY**. **AFTER HOURS** is the same office after everybody useful has gone home.
+- config update on launch
+- plugin update on launch
+- parser update on launch
+- Lazy background checker on every launch
 
 ## PychoClose
 
-`Ctrl+C` and `Ctrl+D` open this from normal, insert, visual, or terminal mode:
+`Ctrl+C` and `Ctrl+D` open this from normal, insert, visual or terminal mode:
 
 ```text
  PychoClose
@@ -104,8 +175,6 @@ The normal palette is **SANITY**. **AFTER HOURS** is the same office after every
   2  Exit dirty
   3  Cancel
 ```
-
-`1/2/3`, arrows or `j/k`, `Enter`, `Esc`.
 
 Yes, `Ctrl+D` normally scrolls half a page. This is not a neutral config.
 
@@ -133,22 +202,18 @@ Current Git branch, cwd, loaded plugin count and active LSP count presented with
 
 `<leader>pb`.
 
-No watermark. Bone coloring depends on your terminal.
-
 ## Morning Routine
 
-```vim
-:MorningRoutine
+```bash
+pycho doctor
 ```
 
-Checks Neovim, Git, ripgrep, compiler availability, plugin state and the current mask.
-
-`<leader>pr` or `pycho doctor`.
+Checks Neovim, Git, curl, archive tools, ripgrep, compiler, Node/npm, tree-sitter CLI, plugins, auto-update state and the current mask.
 
 ## Stack
 
 - `lazy.nvim` — plugins, limited to two concurrent network jobs
-- native `vim.lsp` + Mason — language servers
+- native `vim.lsp` + `mason-org/mason.nvim` — language servers
 - `blink.cmp` — completion
 - `conform.nvim` — formatting
 - Telescope — finding things
@@ -158,11 +223,11 @@ Checks Neovim, Git, ripgrep, compiler availability, plugin state and the current
 - Snacks — dashboard, picker and input UI
 - Catppuccin — syntax palette underneath PSYCHOVIM overrides
 
-Default LSPs: `lua_ls`, `pyright`, `ts_ls`, `gopls`, `rust_analyzer`.
+Default LSP targets: `lua_ls`, `pyright`, `ts_ls`, `gopls`, `rust_analyzer`.
 
-Default formatters: Lua -> `stylua`; Python -> `ruff_format`; JS/TS/JSON/Markdown -> `prettierd`, then `prettier`.
+Formatter map: Lua -> `stylua`; Python -> `ruff_format`; JS/TS/JSON/Markdown -> `prettierd`, then `prettier`.
 
-Manual format: `<leader>cf`.
+Language runtimes are still language runtimes: a Go project needs Go, Rust work needs a Rust toolchain, etc. PSYCHOVIM installs editor infrastructure; it does not quietly turn your machine into every SDK known to man.
 
 ## Useful keys
 
@@ -196,6 +261,7 @@ Leader is `Space`.
 
 ```bash
 pycho status
+PSYCHOVIM_NO_AUTOUPDATE=1 pycho
 pycho update
 ```
 
@@ -209,7 +275,7 @@ Inside Neovim:
 :PychoParsers
 ```
 
-Plugin logs live under `~/.cache/psychovim/`. Broken icons usually mean no Nerd Font. No live grep usually means no `ripgrep`.
+Plugin logs live under `~/.cache/psychovim/`.
 
 ## Repo
 
