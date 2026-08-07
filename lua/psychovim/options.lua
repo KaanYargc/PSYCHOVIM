@@ -35,6 +35,22 @@ opt.writebackup = false
 opt.updatetime = 200
 opt.timeoutlen = 300
 
+-- Native safety net for commands we do not wrap ourselves. Instead of E37/E89,
+-- Neovim asks what to do with unsaved changes.
+opt.confirm = true
+
+-- Dorsia sessions restore the useful shape of a project without carrying UI noise.
+opt.sessionoptions = {
+  "buffers",
+  "curdir",
+  "folds",
+  "help",
+  "tabpages",
+  "winsize",
+  "terminal",
+  "localoptions",
+}
+
 opt.completeopt = { "menu", "menuone", "noselect" }
 opt.pumheight = 12
 
