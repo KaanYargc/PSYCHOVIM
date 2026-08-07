@@ -26,19 +26,8 @@ end
 
 -- Ctrl+S should save, not appear broken or freeze a terminal via flow control.
 map("n", "<C-s>", smart.save, { desc = "SmartSave" })
-map("x", "<C-s>", function()
-  vim.cmd("normal! <Esc>")
-  smart.save()
-end, { desc = "SmartSave" })
-map("i", "<C-s>", function()
-  vim.cmd("stopinsert")
-  smart.save()
-  vim.schedule(function()
-    if vim.api.nvim_get_mode().mode:sub(1, 1) ~= "i" then
-      vim.cmd("startinsert")
-    end
-  end)
-end, { desc = "SmartSave" })
+map("x", "<C-s>", "<Esc><cmd>lua require('psychovim.smart_actions').save()<cr>", { desc = "SmartSave" })
+map("i", "<C-s>", "<C-o><cmd>lua require('psychovim.smart_actions').save()<cr>", { desc = "SmartSave" })
 map("t", "<C-s>", smart.terminal_ctrl_s, { desc = "Prevent terminal flow-control freeze" })
 
 -- Newcomers expect Ctrl+Z to undo. Native Neovim suspends the whole editor instead.
