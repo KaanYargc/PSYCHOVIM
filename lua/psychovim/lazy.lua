@@ -1,5 +1,6 @@
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
 local pycho_state = vim.fn.stdpath("state") .. "/psychovim"
+local maintenance = vim.env.PSYCHOVIM_MAINTENANCE == "1"
 vim.fn.mkdir(pycho_state, "p")
 
 if not vim.uv.fs_stat(lazypath) then
@@ -40,7 +41,7 @@ require("lazy").setup({
     },
   },
   checker = {
-    enabled = settings.get("plugin_update_check") == true,
+    enabled = not maintenance and settings.get("plugin_update_check") == true,
     notify = false,
     frequency = 0,
     concurrency = 1,
