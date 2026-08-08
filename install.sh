@@ -389,7 +389,7 @@ sync_parsers
 say "${green}${bold}done.${reset} opening PychoVIM..."
 [[ -n "$BACKUP" ]] && say "old config: ${bold}${BACKUP}${reset}"
 
-if [[ "${PSYCHOVIM_NO_AUTOLAUNCH:-0}" != "1" && -t 1 ]]; then
-  exec "$PYCHO_BIN"
+if [[ "${PSYCHOVIM_NO_AUTOLAUNCH:-0}" != "1" && -t 1 && -r /dev/tty && -w /dev/tty ]]; then
+  exec "$PYCHO_BIN" </dev/tty >/dev/tty 2>/dev/tty
 fi
 say "run: ${bold}pycho${reset}"
