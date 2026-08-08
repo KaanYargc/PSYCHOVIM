@@ -29,6 +29,7 @@ return {
       end
 
       opts.dashboard = opts.dashboard or {}
+      opts.dashboard.width = 58
       opts.dashboard.preset = opts.dashboard.preset or {}
       opts.dashboard.preset.header = [[
 PIERCE & PIERCE
@@ -40,15 +41,20 @@ VICE PRESIDENT
 THIS IS NOT AN EXIT.
 ]]
       opts.dashboard.preset.keys = {
+        { icon = " ", key = "f", desc = "Find File", action = find_files },
+        { icon = " ", key = "r", desc = "Recent Files", action = recent_files },
+        { icon = " ", key = "n", desc = "New File", action = ":ene | startinsert" },
         { icon = "󰏗 ", key = "e", desc = "Extensions", action = marketplace.open },
-        { icon = "  ", key = "s", desc = "Settings", action = settings.open },
+        { icon = " ", key = "s", desc = "Settings", action = settings.open },
         { icon = "󰚰 ", key = "u", desc = "Update", action = updater.run },
-        { icon = "󰈞 ", key = "n", desc = "New File", action = ":ene | startinsert" },
-        { icon = "󰈔 ", key = "f", desc = "Find File", action = find_files },
-        { icon = "󰋚 ", key = "r", desc = "Recent Files", action = recent_files },
         { icon = "󰌾 ", key = "d", desc = "Dorsia", action = ":Dorsia" },
         { icon = "󰌪 ", key = "b", desc = "Business Card", action = ":BusinessCard" },
-        { icon = "󰍃 ", key = "q", desc = "PychoClose", action = ":lua require('psychovim.pycho_close').open()" },
+        { icon = " ", key = "q", desc = "PychoClose", action = ":lua require('psychovim.pycho_close').open()" },
+      }
+      opts.dashboard.sections = {
+        { section = "header" },
+        { section = "keys", gap = 1, padding = 1 },
+        { section = "startup" },
       }
     end,
   },
