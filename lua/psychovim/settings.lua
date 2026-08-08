@@ -3,7 +3,6 @@ local M = {}
 local state = { win = nil, buf = nil, row = 1 }
 local settings_dir = vim.fn.stdpath("state") .. "/psychovim"
 local settings_file = settings_dir .. "/settings.json"
-local default_editor = require("psychovim.default_editor")
 
 local defaults = {
   mask = "sanity",
@@ -194,9 +193,6 @@ local function cycle(values)
 end
 
 local rows = {
-  { section = "SYSTEM" },
-  { action = "default_editor" },
-
   { section = "EDITOR" },
   { key = "number", name = "Line numbers" },
   { key = "relativenumber", name = "Relative numbers" },
@@ -242,6 +238,9 @@ local rows = {
   { key = "surround", name = "Surround" },
   { key = "which_key", name = "Which-key" },
 
+  { section = "EXTENSIONS" },
+  { action = "extensions", name = "Installed plugins / settings" },
+
   { section = "AUTOMATION" },
   { key = "highlight_yank", name = "Highlight yank" },
   { key = "trim_whitespace", name = "Trim whitespace on save" },
@@ -283,10 +282,8 @@ end
 
 local function render()
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
-  local default_ok, default_issues = default_editor.status()
-  local attention_line
   local lines = {
-    "  ⚙ PYCHO SETTINGS        󰏗 MARKETPLACE [m]",
+    "  ⚙ PYCHOVIM SETTINGS        󰏗 EXTENSIONS [m]",
     "  workstation policy // changes are filed immediately",
     "",
   }
@@ -294,13 +291,8 @@ local function render()
   for _, item in ipairs(rows) do
     if item.section then
       lines[#lines + 1] = "  " .. item.section
-    elseif item.action == "default_editor" then
-      if default_ok then
-        lines[#lines + 1] = string.format("    %-33s %-13s", "Default text editor", "PYCHO")
-      else
-        lines[#lines + 1] = "    ⚠ MAKE PYCHO DEFAULT TEXT EDITOR    " .. table.concat(default_issues, ", ")
-        attention_line = #lines
-      end
+    elseif item.action == "extensions" then
+      lines[#lines + 1] = string.format("    %-33s %-13s", item.name, "OPEN 󰏗")
     else
       local suffix = restart_keys[item.key] and "  *" or ""
       lines[#lines + 1] = string.format("    %-33s %-13s%s", item.name, display_value(item), suffix)
@@ -308,16 +300,12 @@ local function render()
   end
 
   lines[#lines + 1] = ""
-  lines[#lines + 1] = "  enter/space change   m marketplace   r reset   q leave"
-  lines[#lines + 1] = "  * restart required   settings survive pycho update"
+  lines[#lines + 1] = "  enter/space change   m extensions   r reset   q leave"
+  lines[#lines + 1] = "  * restart required   settings survive pychoUpdate"
 
   vim.bo[state.buf].modifiable = true
   vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
   vim.bo[state.buf].modifiable = false
-  vim.api.nvim_buf_clear_namespace(state.buf, -1, 0, -1)
-  if attention_line then
-    vim.api.nvim_buf_add_highlight(state.buf, -1, "DiagnosticWarn", attention_line - 1, 4, -1)
-  end
 
   if state.win and vim.api.nvim_win_is_valid(state.win) then
     vim.api.nvim_win_set_cursor(state.win, { 3 + selectable[state.row], 2 })
@@ -333,13 +321,8 @@ local function change_current()
   local item = rows[selectable[state.row]]
   if not item then return end
 
-  if item.action == "default_editor" then
-    local ok = default_editor.is_default()
-    if ok then
-      vim.notify("PSYCHOVIM is already the default text editor.", vim.log.levels.INFO, { title = "Pycho System" })
-    else
-      default_editor.make_default(function() render() end)
-    end
+  if item.action == "extensions" then
+    require("psychovim.marketplace").open({ installed = true })
     return
   end
 
@@ -358,7 +341,7 @@ local function change_current()
   render()
 
   if restart_keys[item.key] then
-    vim.notify("Pycho · filed. takes effect after restart")
+    vim.notify("PychoVIM · filed. takes effect after restart")
   end
 end
 
@@ -369,7 +352,7 @@ local function reset_all()
   if ok then theme.apply(config.mask) end
   save()
   render()
-  vim.notify("Pycho · defaults restored")
+  vim.notify("PychoVIM · defaults restored")
 end
 
 local function close()
@@ -391,7 +374,7 @@ function M.open()
   vim.bo[state.buf].bufhidden = "wipe"
   vim.bo[state.buf].swapfile = false
 
-  local width = math.max(54, math.min(92, vim.o.columns - 4))
+  local width = math.max(58, math.min(92, vim.o.columns - 4))
   local content_height = #rows + 7
   local height = math.max(10, math.min(content_height, vim.o.lines - 4))
 
@@ -403,7 +386,7 @@ function M.open()
     col = math.max(0, math.floor((vim.o.columns - width) / 2)),
     style = "minimal",
     border = config.popup_border,
-    title = " ⚙ PYCHO SETTINGS ",
+    title = " ⚙ PYCHOVIM SETTINGS ",
     title_pos = "center",
     noautocmd = true,
   })
@@ -418,7 +401,7 @@ function M.open()
   vim.keymap.set("n", "<Up>", function() move(-1) end, opts)
   vim.keymap.set("n", "<CR>", change_current, opts)
   vim.keymap.set("n", "<Space>", change_current, opts)
-  vim.keymap.set("n", "m", function() require("psychovim.marketplace").open() end, opts)
+  vim.keymap.set("n", "m", function() require("psychovim.marketplace").open({ installed = true }) end, opts)
   vim.keymap.set("n", "r", reset_all, opts)
   vim.keymap.set("n", "q", close, opts)
   vim.keymap.set("n", "<Esc>", close, opts)
@@ -430,7 +413,7 @@ function M.setup()
   read()
   apply_runtime()
   if vim.fn.exists(":PychoSettings") == 0 then
-    vim.api.nvim_create_user_command("PychoSettings", M.open, { desc = "Open Pycho settings" })
+    vim.api.nvim_create_user_command("PychoSettings", M.open, { desc = "Open PychoVIM settings" })
   end
 end
 
