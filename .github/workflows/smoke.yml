@@ -46,9 +46,10 @@ jobs:
 
       - name: Marketplace source contract
         run: |
-          grep -q 'dotfyle.com/trpc' lua/psychovim/marketplace.lua
+          grep -q 'dotfyle.com' lua/psychovim/dotfyle.lua
+          grep -q '/trpc' lua/psychovim/dotfyle.lua
           grep -q 'source = "Dotfyle"' lua/psychovim/marketplace.lua
-          ! grep -q 'api.github.com/search/repositories' lua/psychovim/marketplace.lua
+          ! grep -Rqi 'api.github.com/search/repositories' lua/psychovim/marketplace.lua lua/psychovim/dotfyle.lua
 
       - name: Set up Neovim engine
         uses: rhysd/action-setup-vim@v1
@@ -87,6 +88,14 @@ jobs:
             "+lua assert(type(require('psychovim.pycho_actions').save) == 'function')" \
             "+lua assert(type(require('psychovim.pycho_close').open) == 'function')" \
             "+lua local s=require('psychovim.settings'); assert(type(s.get) == 'function'); assert(s.get('auto_update_config') ~= nil); assert(s.get('tab_width') ~= nil); assert(s.get('linting') ~= nil); assert(s.get('terminal_numbers') ~= nil); assert(s.get('lsp_python') ~= nil)" \
+            +qa
+
+      - name: Smoke Dotfyle client
+        run: |
+          nvim --headless \
+            "+lua local d=require('psychovim.dotfyle'); local u=d._direct_url('searchPlugins',{query='telescope',categories={},sorting='popular',page=1,take=10}); assert(u:find('https://dotfyle.com/trpc/searchPlugins',1,true)); assert(u:find('%22json%22',1,true))" \
+            "+lua local d=require('psychovim.dotfyle'); local p,e=d._unwrap({result={data={json={data={{owner='nvim-telescope',name='telescope.nvim'}},meta={total=1}}}}}); assert(not e); assert(p.data[1].owner=='nvim-telescope'); local b,be=d._unwrap({{result={data={json={data={},meta={total=0}}}}}}); assert(not be and b.meta.total==0)" \
+            "+lua local d=require('psychovim.dotfyle'); local old=d.query; d.query=function(proc,input,done) assert(proc=='searchPlugins'); assert(input.categories[1]=='colorscheme'); done({data={{owner='folke',name='tokyonight.nvim',category='colorscheme',stars=1,configCount=2}},meta={total=1,currentPage=1,lastPage=1}}) end; local hit=false; d.search({kind='theme'},function(rows,err,meta) assert(not err and rows[1].kind=='theme' and meta.total==1); hit=true end); assert(hit); d.query=old" \
             +qa
 
       - name: Smoke extensions
