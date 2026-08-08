@@ -3,6 +3,7 @@ local M = {}
 local state = { win = nil, buf = nil, row = 1 }
 local settings_dir = vim.fn.stdpath("state") .. "/psychovim"
 local settings_file = settings_dir .. "/settings.json"
+local default_editor = require("psychovim.default_editor")
 
 local defaults = {
   mask = "sanity",
@@ -108,10 +109,8 @@ end
 local function read()
   config = vim.deepcopy(defaults)
   if vim.fn.filereadable(settings_file) ~= 1 then return end
-
   local ok_read, raw = pcall(vim.fn.readfile, settings_file)
   if not ok_read then return end
-
   local ok_json, decoded = pcall(vim.json.decode, table.concat(raw, "\n"))
   if ok_json and type(decoded) == "table" then
     config = vim.tbl_deep_extend("force", config, decoded)
@@ -130,7 +129,6 @@ end
 local function apply_runtime()
   vim.g.psychovim_mask = config.mask
   vim.g.disable_autoformat = not config.autoformat
-
   vim.o.number = config.number
   vim.o.relativenumber = config.relativenumber
   vim.o.tabstop = config.tab_width
@@ -168,12 +166,10 @@ function M.set(key, value)
   if defaults[key] == nil then return false end
   config[key] = value
   apply_runtime()
-
   if key == "mask" then
     local ok, theme = pcall(require, "psychovim.theme")
     if ok then theme.apply(config.mask) end
   end
-
   save()
   return true
 end
@@ -198,6 +194,9 @@ local function cycle(values)
 end
 
 local rows = {
+  { section = "SYSTEM" },
+  { action = "default_editor" },
+
   { section = "EDITOR" },
   { key = "number", name = "Line numbers" },
   { key = "relativenumber", name = "Relative numbers" },
@@ -272,7 +271,7 @@ local rows = {
 
 local selectable = {}
 for row_index, item in ipairs(rows) do
-  if item.key then selectable[#selectable + 1] = row_index end
+  if item.key or item.action then selectable[#selectable + 1] = row_index end
 end
 
 local function display_value(item)
@@ -284,9 +283,10 @@ end
 
 local function render()
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
-
+  local default_ok, default_issues = default_editor.status()
+  local attention_line
   local lines = {
-    "  PIERCE & PIERCE / SYSTEMS",
+    "  ⚙ PYCHO SETTINGS        󰏗 MARKETPLACE [m]",
     "  workstation policy // changes are filed immediately",
     "",
   }
@@ -294,6 +294,13 @@ local function render()
   for _, item in ipairs(rows) do
     if item.section then
       lines[#lines + 1] = "  " .. item.section
+    elseif item.action == "default_editor" then
+      if default_ok then
+        lines[#lines + 1] = string.format("    %-33s %-13s", "Default text editor", "PYCHO")
+      else
+        lines[#lines + 1] = "    ⚠ MAKE PYCHO DEFAULT TEXT EDITOR    " .. table.concat(default_issues, ", ")
+        attention_line = #lines
+      end
     else
       local suffix = restart_keys[item.key] and "  *" or ""
       lines[#lines + 1] = string.format("    %-33s %-13s%s", item.name, display_value(item), suffix)
@@ -301,12 +308,16 @@ local function render()
   end
 
   lines[#lines + 1] = ""
-  lines[#lines + 1] = "  enter/space change   r reset   q leave"
+  lines[#lines + 1] = "  enter/space change   m marketplace   r reset   q leave"
   lines[#lines + 1] = "  * restart required   settings survive pycho update"
 
   vim.bo[state.buf].modifiable = true
   vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
   vim.bo[state.buf].modifiable = false
+  vim.api.nvim_buf_clear_namespace(state.buf, -1, 0, -1)
+  if attention_line then
+    vim.api.nvim_buf_add_highlight(state.buf, -1, "DiagnosticWarn", attention_line - 1, 4, -1)
+  end
 
   if state.win and vim.api.nvim_win_is_valid(state.win) then
     vim.api.nvim_win_set_cursor(state.win, { 3 + selectable[state.row], 2 })
@@ -321,6 +332,16 @@ end
 local function change_current()
   local item = rows[selectable[state.row]]
   if not item then return end
+
+  if item.action == "default_editor" then
+    local ok = default_editor.is_default()
+    if ok then
+      vim.notify("PSYCHOVIM is already the default text editor.", vim.log.levels.INFO, { title = "Pycho System" })
+    else
+      default_editor.make_default(function() render() end)
+    end
+    return
+  end
 
   if item.next then
     config[item.key] = item.next(config[item.key])
@@ -370,7 +391,7 @@ function M.open()
   vim.bo[state.buf].bufhidden = "wipe"
   vim.bo[state.buf].swapfile = false
 
-  local width = math.max(40, math.min(82, vim.o.columns - 4))
+  local width = math.max(54, math.min(92, vim.o.columns - 4))
   local content_height = #rows + 7
   local height = math.max(10, math.min(content_height, vim.o.lines - 4))
 
@@ -382,7 +403,7 @@ function M.open()
     col = math.max(0, math.floor((vim.o.columns - width) / 2)),
     style = "minimal",
     border = config.popup_border,
-    title = " PYCHO SETTINGS ",
+    title = " ⚙ PYCHO SETTINGS ",
     title_pos = "center",
     noautocmd = true,
   })
@@ -397,6 +418,7 @@ function M.open()
   vim.keymap.set("n", "<Up>", function() move(-1) end, opts)
   vim.keymap.set("n", "<CR>", change_current, opts)
   vim.keymap.set("n", "<Space>", change_current, opts)
+  vim.keymap.set("n", "m", function() require("psychovim.marketplace").open() end, opts)
   vim.keymap.set("n", "r", reset_all, opts)
   vim.keymap.set("n", "q", close, opts)
   vim.keymap.set("n", "<Esc>", close, opts)
