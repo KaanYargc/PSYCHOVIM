@@ -3,6 +3,8 @@ return {
     "folke/snacks.nvim",
     opts = function(_, opts)
       local settings = require("psychovim.settings")
+      local marketplace = require("psychovim.marketplace")
+      local default_editor = require("psychovim.default_editor")
 
       opts.input = { enabled = true }
       opts.picker = vim.tbl_deep_extend("force", opts.picker or {}, {
@@ -26,6 +28,7 @@ return {
         end
       end
 
+      local default_ok = default_editor.is_default()
       opts.dashboard = opts.dashboard or {}
       opts.dashboard.preset = opts.dashboard.preset or {}
       opts.dashboard.preset.header = [[
@@ -38,10 +41,11 @@ VICE PRESIDENT
 THIS IS NOT AN EXIT.
 ]]
       opts.dashboard.preset.keys = {
+        { icon = default_ok and "⚙ " or " ⚙ ", key = "s", desc = default_ok and "Settings" or "Settings · restore default editor", action = settings.open },
+        { icon = "󰏗 ", key = "p", desc = "Marketplace", action = marketplace.open },
         { icon = "  ", key = "f", desc = "Find File", action = find_files },
         { icon = "  ", key = "r", desc = "Recent Files", action = recent_files },
         { icon = "  ", key = "n", desc = "New File", action = ":ene | startinsert" },
-        { icon = "  ", key = "s", desc = "Settings", action = ":PychoSettings" },
         { icon = "  ", key = "b", desc = "Business Card", action = ":BusinessCard" },
         { icon = "  ", key = "d", desc = "Dorsia", action = ":Dorsia" },
         { icon = "  ", key = "m", desc = "Morning Routine", action = ":MorningRoutine" },
@@ -54,6 +58,10 @@ THIS IS NOT AN EXIT.
   {
     "nvim-lualine/lualine.nvim",
     opts = function(_, opts)
+      local settings = require("psychovim.settings")
+      local marketplace = require("psychovim.marketplace")
+      local default_editor = require("psychovim.default_editor")
+
       opts.sections = opts.sections or {}
       opts.sections.lualine_a = {
         {
@@ -61,6 +69,23 @@ THIS IS NOT AN EXIT.
           fmt = function(value)
             return "P&P " .. value
           end,
+        },
+      }
+      opts.sections.lualine_z = {
+        "location",
+        {
+          function()
+            return default_editor.is_default() and "⚙" or " ⚙"
+          end,
+          on_click = function() settings.open() end,
+          separator = { left = "", right = "" },
+          padding = { left = 1, right = 1 },
+        },
+        {
+          function() return "󰏗" end,
+          on_click = function() marketplace.open() end,
+          separator = { left = "", right = "" },
+          padding = { left = 1, right = 1 },
         },
       }
     end,
