@@ -31,13 +31,14 @@ local function handle_phase(line, terminal)
   if kind == "error" then level = vim.log.levels.ERROR end
   if kind == "done" or kind == "warn" or kind == "error" then terminal.value = true end
 
+  message = message:gsub("PSYCHOVIM", "PychoVIM")
   notify(message, level)
 end
 
 function M.run(opts)
   opts = opts or {}
   if state.running then
-    notify("Update already running.")
+    if not opts.auto then notify("Update already running.") end
     return
   end
   if opts.auto and not auto_enabled() then return end
@@ -50,7 +51,7 @@ function M.run(opts)
 
   state.running = true
   local terminal = { value = false }
-  notify("Checking updates...")
+  notify(opts.auto and "Checking updates..." or "Checking for PychoVIM updates...")
 
   local command = { pycho, opts.auto and "auto-update" or "update", "--ui-stream" }
   local job = vim.fn.jobstart(command, {
@@ -73,7 +74,7 @@ function M.run(opts)
         vim.g.pycho_updater_last_error = nil
         notify(message and message ~= "" and message or "Update failed. See ~/.cache/psychovim/.", vim.log.levels.ERROR)
       elseif code == 0 and not terminal.value then
-        notify("PSYCHOVIM is current.")
+        notify("PychoVIM is up to date.")
       end
     end,
   })
