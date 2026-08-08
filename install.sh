@@ -7,8 +7,10 @@ CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 TARGET="${PSYCHOVIM_DIR:-$CONFIG_HOME/nvim}"
 BIN_DIR="${PSYCHOVIM_BIN_DIR:-$HOME/.local/bin}"
-NVIM_HOME="${PSYCHOVIM_NVIM_DIR:-$DATA_HOME/psychovim/neovim}"
-TS_HOME="${PSYCHOVIM_TREE_SITTER_DIR:-$DATA_HOME/psychovim/tree-sitter}"
+PSYCHO_HOME="$DATA_HOME/psychovim"
+NVIM_HOME="${PSYCHOVIM_NVIM_DIR:-$PSYCHO_HOME/neovim}"
+NVIM_PATH_FILE="$PSYCHO_HOME/nvim-path"
+TS_HOME="${PSYCHOVIM_TREE_SITTER_DIR:-$PSYCHO_HOME/tree-sitter}"
 NVIM_LINK="$BIN_DIR/nvim"
 TS_LINK="$BIN_DIR/tree-sitter"
 PYCHO_BIN="$BIN_DIR/pycho"
@@ -116,10 +118,12 @@ install_system_dependencies() {
 }
 
 nvim_is_supported() {
-  local executable="$1" version_line major minor
+  local executable="$1"
+  local version_line major minor
   version_line="$("$executable" --version 2>/dev/null | head -n 1 || true)"
   if [[ "$version_line" =~ v([0-9]+)\.([0-9]+) ]]; then
-    major="${BASH_REMATCH[1]}"; minor="${BASH_REMATCH[2]}"
+    major="${BASH_REMATCH[1]}"
+    minor="${BASH_REMATCH[2]}"
     (( major > 0 || (major == 0 && minor >= 12) ))
     return
   fi
@@ -128,7 +132,8 @@ nvim_is_supported() {
 
 detect_neovim_asset() {
   local os arch platform asset_arch
-  os="$(uname -s)"; arch="$(uname -m)"
+  os="$(uname -s)"
+  arch="$(uname -m)"
   case "$os" in Linux) platform="linux" ;; Darwin) platform="macos" ;; *) die "automatic Neovim install supports Linux/macOS only; got: $os" ;; esac
   case "$arch" in x86_64|amd64) asset_arch="x86_64" ;; arm64|aarch64) asset_arch="arm64" ;; *) die "no official Neovim binary mapping for architecture: $arch" ;; esac
   printf 'nvim-%s-%s' "$platform" "$asset_arch"
@@ -143,38 +148,49 @@ install_neovim() {
 
   say "nvim: pulling official stable"
   curl -fL --retry 3 --connect-timeout 15 "$url" -o "$archive" || die "could not download Neovim"
-  rm -rf "$NVIM_HOME"; mkdir -p "$NVIM_HOME"
+  rm -rf "$NVIM_HOME"
+  mkdir -p "$NVIM_HOME"
   tar -xzf "$archive" --strip-components=1 -C "$NVIM_HOME" || die "could not extract Neovim"
   NVIM_EXEC="$NVIM_HOME/bin/nvim"
   [[ -x "$NVIM_EXEC" ]] || die "archive extracted without bin/nvim"
   nvim_is_supported "$NVIM_EXEC" || die "downloaded Neovim is older than 0.12"
-
-  mkdir -p "$BIN_DIR"
-  if [[ ! -e "$NVIM_LINK" || -L "$NVIM_LINK" ]]; then ln -sfn "$NVIM_EXEC" "$NVIM_LINK"; fi
   say "nvim: $("$NVIM_EXEC" --version | head -n 1)"
 }
 
 resolve_neovim() {
+  if [[ -f "$NVIM_PATH_FILE" ]]; then
+    local recorded
+    recorded="$(cat "$NVIM_PATH_FILE" 2>/dev/null || true)"
+    if [[ -n "$recorded" && -x "$recorded" ]] && nvim_is_supported "$recorded"; then
+      NVIM_EXEC="$recorded"
+      say "nvim: $("$NVIM_EXEC" --version | head -n 1)"
+      return
+    fi
+  fi
+
   if [[ -x "$NVIM_HOME/bin/nvim" ]] && nvim_is_supported "$NVIM_HOME/bin/nvim"; then
     NVIM_EXEC="$NVIM_HOME/bin/nvim"
     say "nvim: $("$NVIM_EXEC" --version | head -n 1)"
     return
   fi
+
   if command -v nvim >/dev/null 2>&1; then
     local existing
     existing="$(command -v nvim)"
-    if nvim_is_supported "$existing"; then
+    if ! grep -q 'PSYCHOVIM nvim frontend' "$existing" 2>/dev/null && nvim_is_supported "$existing"; then
       NVIM_EXEC="$existing"
       say "nvim: $("$NVIM_EXEC" --version | head -n 1)"
       return
     fi
   fi
+
   install_neovim
 }
 
 detect_tree_sitter_asset() {
   local os arch platform asset_arch
-  os="$(uname -s)"; arch="$(uname -m)"
+  os="$(uname -s)"
+  arch="$(uname -m)"
   case "$os" in Linux) platform="linux" ;; Darwin) platform="macos" ;; *) return 1 ;; esac
   case "$arch" in x86_64|amd64) asset_arch="x64" ;; arm64|aarch64) asset_arch="arm64" ;; *) return 1 ;; esac
   printf 'tree-sitter-cli-%s-%s.zip' "$platform" "$asset_arch"
@@ -194,7 +210,8 @@ install_tree_sitter() {
 
   say "tree-sitter: pulling official CLI"
   curl -fL --retry 3 --connect-timeout 15 "$url" -o "$archive" || die "could not download tree-sitter CLI"
-  rm -rf "$TS_HOME"; mkdir -p "$TS_HOME/bin"
+  rm -rf "$TS_HOME"
+  mkdir -p "$TS_HOME/bin"
   unzip -qo "$archive" -d "$TS_HOME/bin" || die "could not extract tree-sitter CLI"
   [[ -x "$TS_HOME/bin/tree-sitter" ]] || chmod 755 "$TS_HOME/bin/tree-sitter" 2>/dev/null || true
   [[ -x "$TS_HOME/bin/tree-sitter" ]] || die "tree-sitter archive extracted without executable"
@@ -219,7 +236,9 @@ ensure_launcher_path() {
 
 install_launcher() {
   [[ -f "$TARGET/bin/pycho" ]] || die "$TARGET/bin/pycho is missing; update/reinstall PSYCHOVIM first"
-  mkdir -p "$BIN_DIR"
+  mkdir -p "$BIN_DIR" "$PSYCHO_HOME"
+  printf '%s\n' "$NVIM_EXEC" > "$NVIM_PATH_FILE"
+
   cat > "$PYCHO_BIN" <<EOF
 #!/usr/bin/env bash
 exec bash $(printf '%q' "$TARGET/bin/pycho") "\$@"
@@ -232,15 +251,33 @@ EOF
 #!/usr/bin/env bash
 exec $(printf '%q' "$PYCHO_BIN") update "\$@"
 EOF
-  chmod 755 "$PYCHO_BIN" "$PYCHO_UPDATE_BIN" "$PYCHO_UPDATER_BIN"
+
+  if [[ -e "$NVIM_LINK" || -L "$NVIM_LINK" ]]; then
+    if [[ -L "$NVIM_LINK" ]] || grep -q 'PSYCHOVIM nvim frontend' "$NVIM_LINK" 2>/dev/null; then
+      rm -f "$NVIM_LINK"
+    else
+      mv "$NVIM_LINK" "$NVIM_LINK.pre-psychovim-$STAMP"
+    fi
+  fi
+  cat > "$NVIM_LINK" <<EOF
+#!/usr/bin/env bash
+# PSYCHOVIM nvim frontend
+exec $(printf '%q' "$PYCHO_BIN") "\$@"
+EOF
+
+  chmod 755 "$PYCHO_BIN" "$PYCHO_UPDATE_BIN" "$PYCHO_UPDATER_BIN" "$NVIM_LINK"
   say "launcher: ${bold}${PYCHO_BIN}${reset}"
+  say "frontend: ${bold}nvim = pycho${reset}"
   say "updater:  ${bold}pychoUpdate / pychoUpdater${reset}"
   ensure_launcher_path
   export PATH="$BIN_DIR:$PATH"
 }
 
 repair_plugin_checkout() {
-  local name="$1" dir="$LAZY_ROOT/$name" dirty backup
+  local name="$1"
+  local dir="$LAZY_ROOT/$name"
+  local dirty=""
+  local backup=""
   [[ -d "$dir/.git" ]] || return 0
   dirty="$(git -C "$dir" status --porcelain 2>/dev/null || true)"
   [[ -n "$dirty" ]] || return 0
@@ -252,19 +289,25 @@ repair_plugin_checkout() {
 
 sync_plugins() {
   local attempt
-  mkdir -p "$CACHE_DIR"; : > "$SYNC_LOG"
+  mkdir -p "$CACHE_DIR"
+  : > "$SYNC_LOG"
   repair_plugin_checkout "nvim-lspconfig"
   say "plugins: syncing"
   for attempt in 1 2 3; do
-    if PSYCHOVIM_MAINTENANCE=1 "$NVIM_EXEC" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then say "plugins: ${green}ok${reset}"; return 0; fi
-    say "${yellow}plugins:${reset} retry $attempt/3"; sleep $(( attempt * 2 ))
+    if PSYCHOVIM_MAINTENANCE=1 "$NVIM_EXEC" --headless "+Lazy! sync" "+qa" >>"$SYNC_LOG" 2>&1; then
+      say "plugins: ${green}ok${reset}"
+      return 0
+    fi
+    say "${yellow}plugins:${reset} retry $attempt/3"
+    sleep $(( attempt * 2 ))
   done
   say "${yellow}plugins:${reset} incomplete — $SYNC_LOG"
   return 0
 }
 
 sync_tools() {
-  mkdir -p "$CACHE_DIR"; : > "$TOOL_LOG"
+  mkdir -p "$CACHE_DIR"
+  : > "$TOOL_LOG"
   say "tools: installing"
   if PSYCHOVIM_MAINTENANCE=1 "$NVIM_EXEC" --headless "+MasonToolsInstallSync" "+qa" >>"$TOOL_LOG" 2>&1; then
     say "tools: ${green}ok${reset}"
@@ -274,7 +317,8 @@ sync_tools() {
 }
 
 sync_parsers() {
-  mkdir -p "$CACHE_DIR"; : > "$PARSER_LOG"
+  mkdir -p "$CACHE_DIR"
+  : > "$PARSER_LOG"
   command -v tree-sitter >/dev/null 2>&1 || { say "parsers: skipped (tree-sitter CLI missing)"; return 0; }
   say "parsers: syncing"
   if PSYCHOVIM_MAINTENANCE=1 "$NVIM_EXEC" --headless "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" "+qa" >>"$PARSER_LOG" 2>&1; then
@@ -289,7 +333,7 @@ say "${red}${bold}PSYCHOVIM${reset} // SETUP"
 if $LAUNCHER_ONLY; then
   resolve_neovim
   install_launcher
-  "$PYCHO_BIN" default-editor || say "${yellow}default editor needs attention; open Pycho Settings${reset}"
+  "$PYCHO_BIN" default-editor || say "${yellow}default editor needs attention; open ⚙ Settings${reset}"
   say "${green}launcher updated.${reset} try: pycho help"
   exit 0
 fi
