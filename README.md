@@ -1,8 +1,8 @@
-# PSYCHOVIM
+# PychoVIM
 
-Neovim with a Pierce & Pierce dress code and fewer stupid defaults.
+Pierce & Pierce dress code. Fewer stupid editor defaults.
 
-The theme is *American Psycho*. The editor still has to work. No blood-drip ASCII art. No lore dump. No broken keymap excused as atmosphere.
+PychoVIM is an opinionated terminal editor built on the Neovim 0.12+ engine. The theme is *American Psycho*; the editor still has to work. No blood-drip ASCII art, no lore dump, no broken behavior excused as atmosphere.
 
 ## Install
 
@@ -10,53 +10,50 @@ The theme is *American Psycho*. The editor still has to work. No blood-drip ASCI
 curl -fsSL https://raw.githubusercontent.com/OnurByte/PSYCHOVIM/main/install.sh | bash
 ```
 
-The installer handles the boring part:
+That command handles the machine, not just `~/.config/nvim`:
 
-- installs missing system dependencies on `apt`, `dnf`, `pacman`, `zypper`, `apk`, or Homebrew
-- installs Neovim 0.12+ if the machine does not already have a supported build
-- installs the tree-sitter CLI
-- installs plugins
-- installs Mason-managed LSP / formatter / linter tools
-- registers PSYCHOVIM as the default text editor where the platform allows it
-- makes `nvim` and `pycho` use the same PSYCHOVIM frontend
-- opens PSYCHOVIM when setup finishes
+- installs missing Git/archive tools, ripgrep, compiler/make, Node/npm and desktop integration on supported Linux package managers
+- uses Homebrew dependencies on macOS when available
+- installs the stable PychoVIM engine when Neovim 0.12+ is missing or too old
+- installs the official tree-sitter CLI release
+- clones PychoVIM and backs up an existing config
+- installs extensions, Mason tools and parsers
+- makes PychoVIM the default text editor policy
+- opens PychoVIM when setup finishes in an interactive terminal
 
-System packages can require `sudo`. PSYCHOVIM, its managed Neovim, tree-sitter and Mason tools live under the user account.
+The default-editor policy sets `EDITOR`, `VISUAL`, `GIT_EDITOR`, Git's editor, and Linux text-file MIME associations. If another program changes them later, PychoVIM quietly takes them back on launch/focus. It does not ask for permission every morning.
 
-Existing `~/.config/nvim` is timestamped before PSYCHOVIM takes the seat.
+## One frontend
 
-## `pycho` and `nvim`
-
-After installation these mean the same editor:
+These are intentionally the same thing:
 
 ```bash
 pycho
 nvim
-
 pycho .
 nvim .
-
 pycho main.go
 nvim main.go
 ```
 
-Both open Neovim immediately. `pychoUpdater` starts inside the editor after the UI is alive, so startup is not held hostage by GitHub, Mason or Treesitter.
+`nvim` is installed as a PychoVIM frontend wrapper. The real engine path is kept separately so there is no wrapper recursion.
 
-Updater progress appears as normal Neovim notifications:
+Normal launches are quiet. You do **not** get an updater report in the shell before the editor appears.
+
+## pychoUpdater
+
+Every normal launch opens PychoVIM first. Then `pychoUpdater` runs in the background and reports inside the editor:
 
 ```text
-pychoUpdater  Checking updates...
-pychoUpdater  Checking PSYCHOVIM config...
-pychoUpdater  Downloaded 3 config commit(s).
-pychoUpdater  Updating plugins...
-pychoUpdater  Updating LSP, formatter and linter tools...
-pychoUpdater  Updating Treesitter parsers...
-pychoUpdater  PSYCHOVIM is current.
+pychoUpdater
+Checking updates...
+Downloading plugin updates...
+Updating LSP, formatter and linter tools...
+Updating Treesitter parsers...
+PychoVIM is up to date.
 ```
 
-No `pychoUpdater // CHECK` wall is printed before the editor opens. Multiple PSYCHOVIM instances share an updater lock, so they do not all attack the same plugin checkout at once.
-
-Manual update commands:
+Manual update names are equivalent:
 
 ```bash
 pycho update
@@ -64,47 +61,79 @@ pychoUpdate
 pychoUpdater
 ```
 
-Inside Neovim:
+Inside PychoVIM:
 
 ```vim
 :PychoUpdate
 :PychoUpdater
 ```
 
-Config updates are fast-forward only. Real edits inside the managed checkout are not overwritten. Runtime state such as `lazy-lock.json` lives outside the repo; an old stray `lazy-lock.json` is migrated automatically instead of making the updater scream `config dirty` forever.
+If a config update replaces the updater itself, the updater reloads its new version before continuing. Update state is locked so two PychoVIM instances do not run the same maintenance pass over each other.
 
-Emergency offline boot:
+Emergency no-network launch:
 
 ```bash
 PSYCHOVIM_NO_AUTOUPDATE=1 pycho
 ```
 
-## The two buttons that matter
+## 󰏗 Extensions
 
-The statusline keeps these on the right:
+`Plugin Inventory` and `Marketplace` are one screen now:
 
-```text
-⚙   󰏗
+```bash
+pycho extensions
+pycho marketplace
 ```
 
-`⚙` opens **Pycho Settings**. `󰏗` opens **Pycho Marketplace**. If mouse support is enabled, both are clickable.
+or:
 
-Dashboard shortcuts:
-
-```text
-s   ⚙ Settings
-p   󰏗 Marketplace
+```vim
+:PychoExtensions
+:PychoMarketplace
+:PychoInventory
 ```
+
+`<leader>pp` opens it.
+
+The screen has three jobs:
+
+- **Installed** — PychoVIM core extensions plus Marketplace installs
+- **Search** — live GitHub repository search for `topic:neovim-plugin`
+- **Themes** — live GitHub search for `topic:neovim-colorscheme`
+
+GitHub results are sorted by stars and include the repository description. Public search works without authentication. `GITHUB_TOKEN` or `GH_TOKEN` is used automatically when present for a friendlier API rate limit.
 
 Keys:
 
-```text
-Space p s   Settings
-Space p p   Marketplace
-Space p u   pychoUpdater
-```
+| Key | Action |
+| --- | --- |
+| `i` | installed inventory |
+| `/` | search extensions |
+| `t` | search themes |
+| `Enter` | install / configure |
+| `c` | extension settings |
+| `r` | refresh current search |
+| `u` | run pychoUpdate |
+| `s` | open Settings |
+| `q` | close |
 
-## ⚙ Pycho Settings
+Marketplace state lives under editor state rather than the Git checkout, so `pychoUpdate` does not erase it.
+
+### Extension settings
+
+Marketplace extensions can be enabled/disabled, changed between startup and `VeryLazy`, removed, and given a JSON `opts` object that is passed to lazy.nvim. Known extensions such as Oil, ToggleTerm, Trouble and Neogit also get sane PychoVIM defaults.
+
+Arbitrary GitHub code does **not** get an invented Lua `config=function()` from PychoVIM. If a plugin needs custom executable Lua, that remains plugin-specific code rather than fake automatic configuration.
+
+Core extension switches still live in `⚙ PychoVIM Settings`.
+
+### Themes
+
+Themes are first-class Marketplace entries. Search with `t`, install one, then configure/activate it from Installed. Known themes have their `:colorscheme` name filled automatically; unknown themes ask for the command name once.
+
+PychoVIM's Mask / After Hours highlight layer stays on top, so changing the base theme does not turn the editor into a random theme pack.
+
+## ⚙ Settings
 
 ```bash
 pycho settings
@@ -116,33 +145,14 @@ or:
 :PychoSettings
 ```
 
-`j/k` or arrows move. `Enter` / `Space` changes the selected setting. `m` jumps to Marketplace. `r` restores defaults. `q` leaves.
+`<leader>ps` opens the same panel. The statusline keeps `` Settings and `󰏗` Extensions next to each other.
 
-Settings are stored in Neovim state, not in the Git checkout, so `pychoUpdate` does not eat them.
+Settings are persistent and survive updates.
 
-### SYSTEM
+### Editor
 
-PSYCHOVIM installs itself as the shell editor (`EDITOR` / `VISUAL`), Git editor, and on Linux the `text/plain` desktop handler through `xdg-mime`.
-
-If another program changes that later, Settings stops being subtle:
-
-```text
-⚠ MAKE PYCHO DEFAULT TEXT EDITOR
-```
-
-Press Enter on it to restore the association.
-
-You can also do it from the shell:
-
-```bash
-pycho default-editor
-```
-
-### EDITOR
-
-- line numbers
-- relative numbers
-- tab / indent width: 2 / 4 / 8
+- line / relative numbers
+- indent width 2 / 4 / 8
 - spaces vs tabs
 - wrap
 - mouse
@@ -153,29 +163,22 @@ pycho default-editor
 
 ### UI
 
-- **SANITY / AFTER HOURS** palette
+- SANITY / AFTER HOURS
 - cursor line
 - invisible characters
-- popup borders
+- popup border
 - notifications
-- diagnostics
-- diagnostic virtual text
+- diagnostics / virtual text
 - statusline
 - buffer tabs
 
-### TOOLING
+### Tooling
 
-- `blink.cmp` completion
-- native LSP + Mason
-- Lua LSP
-- Python LSP
-- TypeScript / JavaScript LSP
-- Go LSP
-- Rust LSP
-- Conform formatting
-- format on save
-- `nvim-lint`
-- lint on save
+- blink.cmp completion
+- LSP / Mason
+- Lua / Python / TypeScript-JS / Go / Rust LSP toggles
+- Conform formatting + format on save
+- nvim-lint + lint on save
 - Treesitter
 - Telescope
 - file tree
@@ -185,90 +188,51 @@ pycho default-editor
 - autopairs
 - surround
 - which-key
+- installed extension settings → opens the Extensions inventory
 
-Python linting uses Ruff. JavaScript / TypeScript uses `eslint_d` only when an ESLint config actually exists in the project. Manual lint: `<leader>cl`.
+Python linting uses Ruff. JS/TS uses `eslint_d` only when an ESLint config actually exists above the current file.
 
-Mason installs Stylua, Ruff, Prettierd, Prettier, ESLint_d, Lua Language Server, Pyright and TypeScript Language Server. Go and Rust servers are included when those runtimes exist.
-
-### AUTOMATION
-
-- yank highlight
-- trim trailing whitespace on save
-- restore last cursor position
-- optional startup deadpan
-
-### TERMINAL
+### Terminal
 
 - terminal line numbers
 - terminal sign column
-- start terminal in insert mode
+- start in insert mode
 
-### PYCHO PATCHES
-
-These are features, not accidents.
+### Pycho patches
 
 | Patch | Default |
 | --- | --- |
-| `Ctrl+C` / `Ctrl+D` -> **PychoClose** | ON |
-| `Ctrl+S` -> **PychoSave** | ON |
-| `Ctrl+Z` -> undo | ON |
-| `Ctrl+F/P/A` -> familiar shortcuts | ON |
-| Visual `p` keeps the yank register | ON |
+| `Ctrl+C` / `Ctrl+D` → **PychoClose** | ON |
+| `Ctrl+S` → **PychoSave** | ON |
+| `Ctrl+Z` → undo | ON |
+| `Ctrl+F/P/A` familiar shortcuts | ON |
+| visual paste keeps yank register | ON |
 | dirty-exit confirmation | ON |
-| terminal `Esc` leaves terminal insert mode | ON |
-
-Turn one off and native Neovim gets the key back.
-
-### UPDATES
-
-- config update on launch
-- plugin / Mason tool update on launch
-- parser update on launch
-- Lazy background checker
-
-Every normal `pycho` **and** `nvim` launch opens the editor first, then starts `pychoUpdater` asynchronously. On launches where `pychoUpdater` is active, Lazy's separate checker stays quiet so the two network jobs do not race. If automatic update lanes are disabled in Settings, Lazy's optional checker can still be used independently.
-
-## 󰏗 Pycho Marketplace
-
-```bash
-pycho marketplace
-```
-
-or:
-
-```vim
-:PychoMarketplace
-```
-
-The built-in catalog currently includes Oil, ToggleTerm, Trouble, Zen Mode, Neogit and Undotree.
-
-Select one and press Enter to install/remove it. Downloads happen immediately; activation happens on the next launch. Removed plugins disappear from the spec and Lazy cleans them normally.
-
-Press `a` to add any GitHub plugin using `owner/repo` form. Marketplace state also lives outside the managed config checkout.
-
-This is not trying to clone VS Code's entire extension website into a terminal. It is trying to remove the part where installing one Neovim plugin requires remembering which Lua file owns reality.
-
-## PychoClose
-
-`Ctrl+C` and `Ctrl+D` open this from normal, insert, visual or terminal mode:
-
-```text
- PychoClose
-
- Dirty buffers: 2
-
-  1  Save all & exit
-  2  Exit dirty
-  3  Cancel
-```
+| terminal `Esc` leaves terminal insert | ON |
 
 Yes, `Ctrl+D` normally scrolls half a page. This is not a neutral config.
 
-`<leader>bd` is **PychoBufferClose**. `<leader>Q` always opens PychoClose.
+## Dashboard
+
+The dashboard uses one icon column and one navigation order:
+
+```text
+󰏗  Extensions
+   Settings
+󰚰  Update
+󰈞  New File
+󰈔  Find File
+󰋚  Recent Files
+󰌾  Dorsia
+󰌪  Business Card
+󰍃  PychoClose
+```
+
+No separate Marketplace/Inventory entries competing for the same job.
 
 ## Dorsia
 
-Project sessions, because getting a table is apparently easier than rebuilding six splits every morning.
+Project sessions, because apparently getting a table is easier than rebuilding six splits every morning.
 
 ```vim
 :DorsiaSave
@@ -284,9 +248,7 @@ Keys: `<leader>pd`, `<leader>pS`, `<leader>px`.
 :BusinessCard
 ```
 
-Current Git branch, cwd, loaded plugin count and active LSP count presented with an unreasonable amount of corporate dignity.
-
-`<leader>pb`.
+Current branch, cwd, loaded extension count and active LSP count presented with an unreasonable amount of corporate dignity.
 
 ## Morning Routine
 
@@ -294,7 +256,23 @@ Current Git branch, cwd, loaded plugin count and active LSP count presented with
 pycho doctor
 ```
 
-Checks Neovim, Git, curl, archive tools, ripgrep, compiler, Node/npm, tree-sitter, plugins, update state and the current mask.
+Checks the PychoVIM core, Git, curl, archives, ripgrep, compiler, Node/npm, tree-sitter CLI, extensions, updater policy and Mask.
+
+## Toolchain
+
+Mason manages the tools PychoVIM calls by default:
+
+- Stylua
+- Ruff
+- Prettierd / Prettier
+- ESLint_d
+- Lua Language Server
+- Pyright
+- TypeScript Language Server
+- `gopls` when Go exists
+- `rust-analyzer` when a Rust toolchain exists
+
+Language runtimes are still language runtimes. PychoVIM does not quietly install every SDK on earth.
 
 ## Useful keys
 
@@ -302,8 +280,8 @@ Leader is `Space`.
 
 | Key | Action |
 | --- | --- |
-| `<leader>ps` | ⚙ Settings |
-| `<leader>pp` | 󰏗 Marketplace |
+| `<leader>ps` | Settings |
+| `<leader>pp` | Extensions |
 | `<leader>pu` | pychoUpdater |
 | `<leader>pb` | Business Card |
 | `<leader>pm` | Mask / After Hours |
@@ -311,18 +289,14 @@ Leader is `Space`.
 | `<leader>pd` | Dorsia |
 | `<leader>ff` | Find files |
 | `<leader>fg` | Live grep |
-| `<leader>fb` | Buffers |
-| `<leader>fr` | Recent files |
 | `<leader>e` | File tree |
 | `<leader>cf` | Format |
-| `<leader>cl` | Lint current file |
+| `<leader>cl` | Lint |
 | `<leader>ca` | Code action |
-| `<leader>rn` | Rename symbol |
+| `<leader>rn` | Rename |
 | `gd` | Definition |
 | `gr` | References |
 | `K` | Hover docs |
-| `[d` / `]d` | Diagnostics |
-| `<Tab>` / `<S-Tab>` | Buffers |
 | `<C-h/j/k/l>` | Windows |
 | `<leader>tt` | Terminal |
 | `jk` / `kj` | Escape insert mode |
@@ -331,40 +305,23 @@ Leader is `Space`.
 
 ```bash
 pycho status
-pychoUpdate
 PSYCHOVIM_NO_AUTOUPDATE=1 pycho
+pycho update
 ```
 
-Inside Neovim:
+Inside:
 
 ```vim
 :checkhealth
 :Lazy
 :Mason
 :ConformInfo
+:PychoExtensions
 :PychoParsers
-:PychoSettings
-:PychoMarketplace
 ```
 
-Logs live under `~/.cache/psychovim/`.
+Maintenance logs live under `~/.cache/psychovim/`.
 
-## Stack
-
-- `lazy.nvim`
-- native `vim.lsp`
-- `mason-org/mason.nvim`
-- `mason-tool-installer.nvim`
-- `blink.cmp`
-- `conform.nvim`
-- `nvim-lint`
-- Telescope
-- nvim-tree
-- nvim-treesitter
-- gitsigns
-- Snacks
-- Catppuccin underneath the PSYCHOVIM highlight layer
-
-Plugin network work is deliberately low-concurrency. The previous "clone half of GitHub at once and hope TLS enjoys it" policy has been retired.
+Every push to `main` validates shell syntax, parses every Lua file, syncs the extension set and starts PychoVIM headlessly.
 
 MIT. Unofficial fan project. Not affiliated with Bret Easton Ellis, Lionsgate, or the film's rights holders.
