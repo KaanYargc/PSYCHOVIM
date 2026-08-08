@@ -36,6 +36,12 @@ jobs:
           grep -qx '1' /tmp/pychovim-auto-request
           grep -qx 'sample.lua' /tmp/pychovim-launch-args
 
+      - name: Marketplace source contract
+        run: |
+          grep -q 'dotfyle.com/trpc' lua/psychovim/marketplace.lua
+          grep -q 'source = "Dotfyle"' lua/psychovim/marketplace.lua
+          ! grep -q 'api.github.com/search/repositories' lua/psychovim/marketplace.lua
+
       - name: Set up Neovim engine
         uses: rhysd/action-setup-vim@v1
         with:
@@ -78,7 +84,7 @@ jobs:
       - name: Smoke extensions
         run: |
           nvim --headless \
-            "+lua local m=require('psychovim.marketplace'); assert(type(m.specs) == 'function'); assert(type(m.apply_active_theme) == 'function')" \
+            "+lua local m=require('psychovim.marketplace'); assert(type(m.specs) == 'function'); assert(type(m.apply_active_theme) == 'function'); assert(type(m.search) == 'function'); assert(m.source == 'Dotfyle'); assert(m.source_url == 'https://dotfyle.com/neovim/configurations/plugins')" \
             "+lua assert(vim.fn.exists(':PychoMarketplace') == 2)" \
             "+lua assert(vim.fn.exists(':PychoExtensions') == 2)" \
             "+lua assert(vim.fn.exists(':PychoInventory') == 2)" \
