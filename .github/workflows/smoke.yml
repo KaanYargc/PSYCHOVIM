@@ -36,6 +36,14 @@ jobs:
           grep -qx '1' /tmp/pychovim-auto-request
           grep -qx 'sample.lua' /tmp/pychovim-launch-args
 
+      - name: Product policy contracts
+        run: |
+          grep -q 'apply_default_editor_policy' install.sh
+          grep -q '</dev/tty >/dev/tty' install.sh
+          ! grep -Rqi 'restore default editor' lua bin install.sh
+          grep -q 'opts.dashboard.width = 58' lua/psychovim/plugin_overrides.lua
+          grep -q 'section = "keys", gap = 1, padding = 1' lua/psychovim/plugin_overrides.lua
+
       - name: Marketplace source contract
         run: |
           grep -q 'dotfyle.com/trpc' lua/psychovim/marketplace.lua
