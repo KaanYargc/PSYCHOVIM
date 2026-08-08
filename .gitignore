@@ -1,0 +1,2 @@
+# Runtime state belongs outside the managed config checkout.
+lazy-lock.json
