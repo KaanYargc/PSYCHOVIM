@@ -55,7 +55,6 @@ resolve_nvim() {
   local candidate
   candidate="$(command -v nvim 2>/dev/null || true)"
   if [[ -n "$candidate" && -x "$candidate" ]]; then
-    # Never resolve back into a Pycho frontend wrapper.
     if ! grep -q 'PSYCHOVIM nvim frontend' "$candidate" 2>/dev/null; then
       NVIM_BIN="$candidate"
       return 0
@@ -63,6 +62,36 @@ resolve_nvim() {
   fi
 
   die "real nvim binary not found; rerun the PSYCHOVIM installer"
+}
+
+ensure_nvim_frontend() {
+  local pycho_cmd bin_dir nvim_frontend backup
+  pycho_cmd="$(command -v pycho 2>/dev/null || true)"
+  [[ -n "$pycho_cmd" && -x "$pycho_cmd" ]] || return 0
+
+  mkdir -p "$PSYCHO_HOME"
+  printf '%s\n' "$NVIM_BIN" > "$NVIM_PATH_FILE"
+
+  bin_dir="$(dirname "$pycho_cmd")"
+  nvim_frontend="$bin_dir/nvim"
+  if [[ -e "$nvim_frontend" || -L "$nvim_frontend" ]]; then
+    if grep -q 'PSYCHOVIM nvim frontend' "$nvim_frontend" 2>/dev/null; then return 0; fi
+    if [[ -L "$nvim_frontend" ]]; then
+      rm -f "$nvim_frontend"
+    else
+      backup="$nvim_frontend.pre-psychovim-$STAMP"
+      mv "$nvim_frontend" "$backup"
+      say "nvim frontend backup $backup"
+    fi
+  fi
+
+  cat > "$nvim_frontend" <<EOF
+#!/usr/bin/env bash
+# PSYCHOVIM nvim frontend
+exec $(printf '%q' "$pycho_cmd") "\$@"
+EOF
+  chmod 755 "$nvim_frontend"
+  hash -r 2>/dev/null || true
 }
 
 migrate_legacy_lockfile() {
@@ -87,7 +116,6 @@ repair_plugin_checkout() {
   local dir="$LAZY_ROOT/$name"
   local dirty=""
   local backup=""
-
   [[ -d "$dir/.git" ]] || return 0
   dirty="$(git -C "$dir" status --porcelain 2>/dev/null || true)"
   [[ -n "$dirty" ]] || return 0
@@ -126,7 +154,6 @@ sync_tools() {
     say "tools        off in settings"
     return 0
   fi
-
   say "tools        syncing"
   if PSYCHOVIM_MAINTENANCE=1 "$NVIM_BIN" --headless "+MasonToolsUpdateSync" "+qa" >>"$TOOL_LOG" 2>&1; then
     say "tools        ${green}ok${reset}"
@@ -148,7 +175,6 @@ sync_parsers() {
     say "parsers      skipped (tree-sitter CLI missing)"
     return 0
   fi
-
   say "parsers      syncing"
   if PSYCHOVIM_MAINTENANCE=1 "$NVIM_BIN" --headless \
     "+lua local ts=require('nvim-treesitter'); local langs={'bash','c','cpp','go','javascript','json','lua','markdown','python','rust','toml','tsx','typescript','vim','vimdoc','yaml'}; for _,lang in ipairs(langs) do ts.install({lang}):wait(300000) end" \
@@ -169,7 +195,6 @@ update_config_strict() {
     filtered_config_status
     die "refusing to update over local config changes"
   fi
-
   local before after count
   before="$(git -C "$CONFIG_DIR" rev-parse HEAD)"
   say "config       fetching $BRANCH"
@@ -190,14 +215,12 @@ update_config_soft() {
     say "config       ${yellow}not a git checkout${reset}"
     return 1
   fi
-
   migrate_legacy_lockfile
   if config_dirty; then
     say "config       ${yellow}local changes; skipped${reset}"
     filtered_config_status
     return 0
   fi
-
   local before after count
   before="$(git -C "$CONFIG_DIR" rev-parse HEAD 2>/dev/null || true)"
   if ! git -C "$CONFIG_DIR" fetch -q --prune origin "$BRANCH"; then
@@ -237,7 +260,6 @@ make_default_editor() {
   [[ -n "$launcher" ]] || launcher="$CONFIG_DIR/bin/pycho"
   [[ -x "$launcher" ]] || die "pycho launcher not found"
   rc=0
-
   shell_name="$(basename "${SHELL:-bash}")"
   case "$shell_name" in
     zsh) profile="$HOME/.zshrc" ;;
@@ -251,11 +273,9 @@ export EDITOR=$(printf '%q' "$launcher")
 export VISUAL=$(printf '%q' "$launcher")
 # <<< PSYCHOVIM default editor <<<
 EOF
-
   if command -v git >/dev/null 2>&1; then
     git config --global core.editor "$launcher" || rc=1
   fi
-
   if [[ "$(uname -s)" == "Linux" ]]; then
     desktop_dir="$DATA_HOME/applications"
     desktop_file="$desktop_dir/psychovim.desktop"
@@ -282,7 +302,6 @@ EOF
       rc=1
     fi
   fi
-
   if (( rc == 0 )); then
     say "default editor ${green}PSYCHOVIM${reset}"
   else
@@ -298,8 +317,8 @@ startup_update() {
   setting_on auto_update_plugins true && do_plugins=true
   setting_on auto_update_parsers true && do_parsers=true
   if ! $do_config && ! $do_plugins && ! $do_parsers; then return 0; fi
-
   resolve_nvim
+  ensure_nvim_frontend
   say "${red}${bold}pychoUpdater${reset} // CHECK"
   if $do_config; then update_config_soft || warning=1; fi
   if $do_plugins; then
@@ -308,7 +327,6 @@ startup_update() {
   fi
   if $do_parsers; then sync_parsers || warning=1; fi
   say ""
-
   if (( warning == 0 )); then
     export PSYCHOVIM_UPDATER_NOTICE="Config, plugins, tools and parsers are current."
     export PSYCHOVIM_UPDATER_WARNING=0
@@ -320,10 +338,10 @@ startup_update() {
 
 update_psychovim() {
   resolve_nvim
+  ensure_nvim_frontend
   command -v git >/dev/null 2>&1 || die "git is required"
   say "${red}${bold}pychoUpdater${reset} // UPDATE"
   update_config_strict
-
   local rc=0
   sync_plugins 3 || rc=1
   sync_tools || rc=1
@@ -339,6 +357,7 @@ update_psychovim() {
 
 show_status() {
   resolve_nvim
+  ensure_nvim_frontend
   migrate_legacy_lockfile
   say "PSYCHOVIM // STATUS"
   say "nvim         $("$NVIM_BIN" --version | head -n 1)"
@@ -366,7 +385,8 @@ pycho parsers          sync Treesitter parsers
 pycho default-editor   make Pycho the default text editor
 pycho help
 
-pychoUpdate and pychoUpdater are installer-provided aliases for `pycho update`.
+nvim and pycho share the same frontend after the first repaired launch.
+pychoUpdate and pychoUpdater are aliases for `pycho update`.
 Every normal launch runs pychoUpdater first and shows the result inside Neovim.
 Use PSYCHOVIM_NO_AUTOUPDATE=1 for an emergency no-network boot.
 EOF
@@ -402,6 +422,7 @@ case "${1:-}" in
   parsers)
     shift
     resolve_nvim
+    ensure_nvim_frontend
     sync_parsers
     ;;
   default-editor)
@@ -414,6 +435,7 @@ case "${1:-}" in
   *)
     startup_update
     resolve_nvim
+    ensure_nvim_frontend
     exec "$NVIM_BIN" "$@"
     ;;
 esac
