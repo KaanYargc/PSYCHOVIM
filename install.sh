@@ -12,6 +12,8 @@ TS_HOME="${PSYCHOVIM_TREE_SITTER_DIR:-$DATA_HOME/psychovim/tree-sitter}"
 NVIM_LINK="$BIN_DIR/nvim"
 TS_LINK="$BIN_DIR/tree-sitter"
 PYCHO_BIN="$BIN_DIR/pycho"
+PYCHO_UPDATE_BIN="$BIN_DIR/pychoUpdate"
+PYCHO_UPDATER_BIN="$BIN_DIR/pychoUpdater"
 LAZY_ROOT="$DATA_HOME/nvim/lazy"
 CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/psychovim"
 SYNC_LOG="$CACHE_DIR/lazy-sync.log"
@@ -59,7 +61,11 @@ system_deps_ready() {
   for cmd in git curl tar gzip unzip rg make node npm; do
     command -v "$cmd" >/dev/null 2>&1 || return 1
   done
-  compiler_available
+  compiler_available || return 1
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    command -v xdg-mime >/dev/null 2>&1 || return 1
+  fi
+  return 0
 }
 
 install_system_dependencies() {
@@ -68,25 +74,25 @@ install_system_dependencies() {
     return 0
   fi
 
-  say "deps: installing git/curl/archive tools/ripgrep/compiler/node"
+  say "deps: installing git/curl/archive tools/ripgrep/compiler/node/desktop integration"
 
   if command -v apt-get >/dev/null 2>&1; then
     run_root apt-get update
     run_root env DEBIAN_FRONTEND=noninteractive apt-get install -y \
-      git curl tar gzip unzip ripgrep build-essential nodejs npm
+      git curl tar gzip unzip ripgrep build-essential nodejs npm xdg-utils
   elif command -v dnf >/dev/null 2>&1; then
     run_root dnf install -y \
-      git curl tar gzip unzip ripgrep gcc gcc-c++ make nodejs npm
+      git curl tar gzip unzip ripgrep gcc gcc-c++ make nodejs npm xdg-utils
   elif command -v pacman >/dev/null 2>&1; then
     run_root pacman -Syu --needed --noconfirm \
-      git curl tar gzip unzip ripgrep base-devel nodejs npm
+      git curl tar gzip unzip ripgrep base-devel nodejs npm xdg-utils
   elif command -v zypper >/dev/null 2>&1; then
     run_root zypper --non-interactive refresh
     run_root zypper --non-interactive install \
-      git curl tar gzip unzip ripgrep gcc gcc-c++ make nodejs npm
+      git curl tar gzip unzip ripgrep gcc gcc-c++ make nodejs npm xdg-utils
   elif command -v apk >/dev/null 2>&1; then
     run_root apk add \
-      git curl tar gzip unzip ripgrep build-base nodejs npm
+      git curl tar gzip unzip ripgrep build-base nodejs npm xdg-utils
   elif command -v brew >/dev/null 2>&1; then
     local brew_pkgs=()
     command -v git >/dev/null 2>&1 || brew_pkgs+=(git)
@@ -218,9 +224,19 @@ install_launcher() {
 #!/usr/bin/env bash
 exec bash $(printf '%q' "$TARGET/bin/pycho") "\$@"
 EOF
-  chmod 755 "$PYCHO_BIN"
+  cat > "$PYCHO_UPDATE_BIN" <<EOF
+#!/usr/bin/env bash
+exec $(printf '%q' "$PYCHO_BIN") update "\$@"
+EOF
+  cat > "$PYCHO_UPDATER_BIN" <<EOF
+#!/usr/bin/env bash
+exec $(printf '%q' "$PYCHO_BIN") update "\$@"
+EOF
+  chmod 755 "$PYCHO_BIN" "$PYCHO_UPDATE_BIN" "$PYCHO_UPDATER_BIN"
   say "launcher: ${bold}${PYCHO_BIN}${reset}"
+  say "updater:  ${bold}pychoUpdate / pychoUpdater${reset}"
   ensure_launcher_path
+  export PATH="$BIN_DIR:$PATH"
 }
 
 repair_plugin_checkout() {
@@ -273,6 +289,7 @@ say "${red}${bold}PSYCHOVIM${reset} // SETUP"
 if $LAUNCHER_ONLY; then
   resolve_neovim
   install_launcher
+  "$PYCHO_BIN" default-editor || say "${yellow}default editor needs attention; open Pycho Settings${reset}"
   say "${green}launcher updated.${reset} try: pycho help"
   exit 0
 fi
@@ -292,8 +309,16 @@ say "clone: ${bold}${REPO_URL}${reset} -> ${bold}${TARGET}${reset} (${BRANCH})"
 if ! git clone --depth 1 --branch "$BRANCH" "$REPO_URL" "$TARGET"; then restore_backup; die "clone failed"; fi
 
 install_launcher
+"$PYCHO_BIN" default-editor || say "${yellow}default editor needs attention; open ⚙ Settings${reset}"
 sync_plugins
 sync_tools
 sync_parsers
-say "${green}${bold}done.${reset} run: ${bold}pycho${reset}"
+say "${green}${bold}done.${reset} opening PSYCHOVIM..."
 [[ -n "$BACKUP" ]] && say "old config: ${bold}${BACKUP}${reset}"
+
+export EDITOR="$PYCHO_BIN"
+export VISUAL="$PYCHO_BIN"
+if [[ "${PSYCHOVIM_NO_AUTOLAUNCH:-0}" != "1" && -t 1 ]]; then
+  exec "$PYCHO_BIN"
+fi
+say "run: ${bold}pycho${reset}"
