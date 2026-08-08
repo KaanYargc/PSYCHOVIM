@@ -1,5 +1,8 @@
 local M = {}
 
+local cache = { ok = nil, issues = {}, checked_at = 0 }
+local ttl_ns = 5 * 1e9
+
 local function trim(value)
   return (value or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
@@ -17,7 +20,7 @@ local function command_output(argv)
   return trim(result.stdout)
 end
 
-function M.status()
+local function inspect()
   local issues = {}
   local editor = vim.env.EDITOR or ""
   local visual = vim.env.VISUAL or ""
@@ -38,11 +41,25 @@ function M.status()
     end
   end
 
-  return #issues == 0, issues
+  cache.ok = #issues == 0
+  cache.issues = issues
+  cache.checked_at = vim.uv.hrtime()
+  return cache.ok, cache.issues
 end
 
-function M.is_default()
-  return M.status()
+function M.refresh()
+  return inspect()
+end
+
+function M.status(force)
+  local stale = cache.ok == nil or (vim.uv.hrtime() - cache.checked_at) > ttl_ns
+  if force or stale then return inspect() end
+  return cache.ok, cache.issues
+end
+
+function M.is_default(force)
+  local ok = M.status(force)
+  return ok
 end
 
 function M.make_default(done)
@@ -57,6 +74,8 @@ function M.make_default(done)
       if result.code == 0 then
         vim.env.EDITOR = pycho
         vim.env.VISUAL = pycho
+        M.refresh()
+        vim.cmd("redrawstatus")
         vim.notify("PSYCHOVIM is the default text editor again.", vim.log.levels.INFO, { title = "Pycho System" })
       else
         local message = trim(result.stderr ~= "" and result.stderr or result.stdout)
@@ -68,7 +87,8 @@ function M.make_default(done)
 end
 
 function M.warn_if_changed()
-  local ok, issues = M.status()
+  local ok, issues = M.status(true)
+  vim.cmd("redrawstatus")
   if ok then return end
   vim.schedule(function()
     vim.notify(
