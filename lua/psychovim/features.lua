@@ -24,38 +24,37 @@ function M.setup()
   routine.setup()
   marketplace.setup()
   updater.setup()
+  marketplace.apply_active_theme()
   theme.apply(vim.g.psychovim_mask or "sanity")
 
   command("PychoSave", actions.save, "Save the current buffer")
   command("PychoClose", close.open, "Open PychoClose")
   command("PychoBufferClose", actions.close_buffer, "Close the current buffer safely")
-  command("PychoMakeDefault", function() default_editor.make_default() end, "Make Pycho the default text editor")
+  command("PychoMakeDefault", function() default_editor.make_default({ notify = true }) end, "Apply the PychoVIM default editor policy")
 
   local map = vim.keymap.set
-  map("n", "<leader>pb", card.open, { desc = "Pycho Business Card" })
-  map("n", "<leader>pm", theme.toggle, { desc = "Pycho Mask" })
-  map("n", "<leader>pr", routine.open, { desc = "Pycho Morning Routine" })
-  map("n", "<leader>pd", dorsia.open, { desc = "Pycho Dorsia" })
-  map("n", "<leader>pS", dorsia.save, { desc = "Pycho Dorsia Save" })
-  map("n", "<leader>px", dorsia.forget, { desc = "Pycho Dorsia Forget" })
-  map("n", "<leader>ps", settings.open, { desc = "⚙ Pycho Settings" })
-  map("n", "<leader>pp", marketplace.open, { desc = "󰏗 Pycho Marketplace" })
+  map("n", "<leader>pb", card.open, { desc = "PychoVIM Business Card" })
+  map("n", "<leader>pm", theme.toggle, { desc = "PychoVIM Mask" })
+  map("n", "<leader>pr", routine.open, { desc = "PychoVIM Morning Routine" })
+  map("n", "<leader>pd", dorsia.open, { desc = "PychoVIM Dorsia" })
+  map("n", "<leader>pS", dorsia.save, { desc = "PychoVIM Dorsia Save" })
+  map("n", "<leader>px", dorsia.forget, { desc = "PychoVIM Dorsia Forget" })
+  map("n", "<leader>ps", settings.open, { desc = "⚙ PychoVIM Settings" })
+  map("n", "<leader>pp", marketplace.open, { desc = "󰏗 PychoVIM Extensions" })
   map("n", "<leader>pu", updater.run, { desc = "pychoUpdater" })
 
-  local system_group = vim.api.nvim_create_augroup("PychoDefaultEditorWatch", { clear = true })
+  local group = vim.api.nvim_create_augroup("PychoDefaultEditorPolicy", { clear = true })
   vim.api.nvim_create_autocmd("VimEnter", {
-    group = system_group,
+    group = group,
     once = true,
     callback = function()
-      if vim.env.PSYCHOVIM_MAINTENANCE ~= "1" then default_editor.warn_if_changed() end
+      vim.defer_fn(default_editor.enforce, 250)
     end,
   })
   vim.api.nvim_create_autocmd("FocusGained", {
-    group = system_group,
+    group = group,
     callback = function()
-      if vim.env.PSYCHOVIM_MAINTENANCE == "1" then return end
-      default_editor.refresh()
-      vim.cmd("redrawstatus")
+      vim.defer_fn(default_editor.enforce, 100)
     end,
   })
 end
