@@ -42,7 +42,7 @@ function M.open()
   local settings = require("psychovim.settings")
   local loaded, total = lazy_stats()
   local width = math.min(68, math.max(52, vim.o.columns - 10))
-  local nvim_version = vim.version()
+  local engine_version = vim.version()
   local mask = vim.g.psychovim_mask == "after_hours" and "AFTER HOURS" or "ON"
 
   local lines = {
@@ -50,7 +50,7 @@ function M.open()
     "  MORNING ROUTINE",
     "  08:30 // system check",
     "",
-    row("Neovim", string.format("%d.%d.%d", nvim_version.major, nvim_version.minor, nvim_version.patch), width - 4),
+    row("PychoVIM core", string.format("%d.%d.%d", engine_version.major, engine_version.minor, engine_version.patch), width - 4),
     row("Git", yesno(vim.fn.executable("git") == 1), width - 4),
     row("curl", yesno(vim.fn.executable("curl") == 1), width - 4),
     row("tar / gzip / unzip", yesno(vim.fn.executable("tar") == 1 and vim.fn.executable("gzip") == 1 and vim.fn.executable("unzip") == 1), width - 4),
@@ -58,8 +58,8 @@ function M.open()
     row("C compiler", yesno(compiler_available()), width - 4),
     row("Node / npm", yesno(vim.fn.executable("node") == 1 and vim.fn.executable("npm") == 1), width - 4),
     row("tree-sitter CLI", yesno(vim.fn.executable("tree-sitter") == 1), width - 4),
-    row("Plugins", string.format("%d / %d", loaded, total), width - 4),
-    row("Auto update", settings.get("auto_update_config") and "ON" or "OFF", width - 4),
+    row("Extensions", string.format("%d / %d", loaded, total), width - 4),
+    row("pychoUpdater", settings.get("auto_update_config") and "ON" or "OFF", width - 4),
     row("Mask", mask, width - 4),
     "",
     "  Good. Get to work.",
@@ -99,7 +99,7 @@ function M.open()
 end
 
 function M.setup()
-  vim.api.nvim_create_user_command("MorningRoutine", M.open, { desc = "Inspect the PSYCHOVIM environment" })
+  vim.api.nvim_create_user_command("MorningRoutine", M.open, { desc = "Inspect the PychoVIM environment" })
 end
 
 return M
