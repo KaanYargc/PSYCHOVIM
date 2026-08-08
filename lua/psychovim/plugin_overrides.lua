@@ -4,7 +4,7 @@ return {
     opts = function(_, opts)
       local settings = require("psychovim.settings")
       local marketplace = require("psychovim.marketplace")
-      local default_editor = require("psychovim.default_editor")
+      local updater = require("psychovim.updater")
 
       opts.input = { enabled = true }
       opts.picker = vim.tbl_deep_extend("force", opts.picker or {}, {
@@ -28,29 +28,27 @@ return {
         end
       end
 
-      local default_ok = default_editor.is_default()
       opts.dashboard = opts.dashboard or {}
       opts.dashboard.preset = opts.dashboard.preset or {}
       opts.dashboard.preset.header = [[
 PIERCE & PIERCE
 MERGERS AND ACQUISITIONS
 
-P S Y C H O V I M
+P Y C H O V I M
 VICE PRESIDENT
 
 THIS IS NOT AN EXIT.
 ]]
       opts.dashboard.preset.keys = {
-        { icon = default_ok and "⚙ " or " ⚙ ", key = "s", desc = default_ok and "Settings" or "Settings · restore default editor", action = settings.open },
-        { icon = "󰏗 ", key = "p", desc = "Marketplace", action = marketplace.open },
-        { icon = "  ", key = "f", desc = "Find File", action = find_files },
-        { icon = "  ", key = "r", desc = "Recent Files", action = recent_files },
-        { icon = "  ", key = "n", desc = "New File", action = ":ene | startinsert" },
-        { icon = "  ", key = "b", desc = "Business Card", action = ":BusinessCard" },
-        { icon = "  ", key = "d", desc = "Dorsia", action = ":Dorsia" },
-        { icon = "  ", key = "m", desc = "Morning Routine", action = ":MorningRoutine" },
-        { icon = "  ", key = "l", desc = "Plugin Inventory", action = ":Lazy" },
-        { icon = "  ", key = "q", desc = "PychoClose", action = ":lua require('psychovim.pycho_close').open()" },
+        { icon = "󰏗 ", key = "e", desc = "Extensions", action = marketplace.open },
+        { icon = "  ", key = "s", desc = "Settings", action = settings.open },
+        { icon = "󰚰 ", key = "u", desc = "Update", action = updater.run },
+        { icon = "󰈞 ", key = "n", desc = "New File", action = ":ene | startinsert" },
+        { icon = "󰈔 ", key = "f", desc = "Find File", action = find_files },
+        { icon = "󰋚 ", key = "r", desc = "Recent Files", action = recent_files },
+        { icon = "󰌾 ", key = "d", desc = "Dorsia", action = ":Dorsia" },
+        { icon = "󰌪 ", key = "b", desc = "Business Card", action = ":BusinessCard" },
+        { icon = "󰍃 ", key = "q", desc = "PychoClose", action = ":lua require('psychovim.pycho_close').open()" },
       }
     end,
   },
@@ -60,7 +58,6 @@ THIS IS NOT AN EXIT.
     opts = function(_, opts)
       local settings = require("psychovim.settings")
       local marketplace = require("psychovim.marketplace")
-      local default_editor = require("psychovim.default_editor")
 
       opts.sections = opts.sections or {}
       opts.sections.lualine_a = {
@@ -74,9 +71,7 @@ THIS IS NOT AN EXIT.
       opts.sections.lualine_z = {
         "location",
         {
-          function()
-            return default_editor.is_default() and "⚙" or " ⚙"
-          end,
+          function() return "" end,
           on_click = function() settings.open() end,
           separator = { left = "", right = "" },
           padding = { left = 1, right = 1 },
@@ -103,9 +98,9 @@ THIS IS NOT AN EXIT.
       treesitter.setup({})
 
       vim.api.nvim_create_user_command("PychoParsers", function()
-        vim.notify("Pycho · parser sync started")
+        vim.notify("Parser sync started.", vim.log.levels.INFO, { title = "PychoVIM" })
         treesitter.install(languages)
-      end, { desc = "Install PSYCHOVIM Treesitter parsers" })
+      end, { desc = "Install PychoVIM Treesitter parsers" })
 
       vim.api.nvim_create_autocmd("FileType", {
         pattern = languages,
