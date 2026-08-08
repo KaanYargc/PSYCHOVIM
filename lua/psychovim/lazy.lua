@@ -25,11 +25,13 @@ end
 vim.opt.rtp:prepend(lazypath)
 
 local settings = require("psychovim.settings")
-
-require("lazy").setup({
+local spec = {
   { import = "plugins" },
   { import = "psychovim.plugin_overrides" },
-}, {
+}
+vim.list_extend(spec, require("psychovim.marketplace").specs())
+
+require("lazy").setup(spec, {
   lockfile = pycho_state .. "/lazy-lock.json",
   concurrency = 2,
   git = {
