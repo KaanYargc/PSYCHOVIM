@@ -23,6 +23,19 @@ jobs:
           bash -n bin/pycho
           bash -u bin/pycho help >/dev/null
 
+      - name: Launcher opens editor before updater
+        run: |
+          cat > /tmp/psychovim-fake-nvim <<'EOF'
+          #!/usr/bin/env bash
+          printf '%s\n' "${PSYCHOVIM_AUTOUPDATE_REQUEST:-}" > /tmp/psychovim-auto-request
+          printf '%s\n' "$*" > /tmp/psychovim-launch-args
+          EOF
+          chmod +x /tmp/psychovim-fake-nvim
+          output="$(PSYCHOVIM_MAINTENANCE=0 PSYCHOVIM_NVIM=/tmp/psychovim-fake-nvim bash bin/pycho sample.lua)"
+          test -z "$output"
+          grep -qx '1' /tmp/psychovim-auto-request
+          grep -qx 'sample.lua' /tmp/psychovim-launch-args
+
       - name: Set up Neovim
         uses: rhysd/action-setup-vim@v1
         with:
@@ -54,6 +67,7 @@ jobs:
             "+lua local s=require('psychovim.settings'); assert(type(s.get) == 'function'); assert(s.get('auto_update_config') ~= nil); assert(s.get('tab_width') ~= nil); assert(s.get('linting') ~= nil); assert(s.get('terminal_numbers') ~= nil); assert(s.get('lsp_python') ~= nil)" \
             "+lua assert(type(require('psychovim.marketplace').specs) == 'function')" \
             "+lua assert(type(require('psychovim.default_editor').status) == 'function')" \
+            "+lua assert(type(require('psychovim.updater').run) == 'function')" \
             "+lua assert(vim.fn.exists(':PychoMarketplace') == 2)" \
             "+lua assert(vim.fn.exists(':PychoUpdate') == 2)" \
             "+lua assert(vim.fn.exists(':PychoUpdater') == 2)" \
