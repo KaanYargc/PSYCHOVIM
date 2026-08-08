@@ -80,12 +80,15 @@ function M.make_default(opts)
   vim.system({ pycho, "default-editor", "--quiet" }, { text = true }, function(result)
     vim.schedule(function()
       enforcing = false
-      if result.code == 0 then
-        vim.env.EDITOR = pycho
-        vim.env.VISUAL = pycho
-        vim.env.GIT_EDITOR = pycho
-        M.refresh()
-        vim.cmd("redrawstatus")
+      vim.env.EDITOR = pycho
+      vim.env.VISUAL = pycho
+      vim.env.GIT_EDITOR = pycho
+
+      local policy_ok = M.refresh()
+      local success = result.code == 0 or policy_ok
+      vim.cmd("redrawstatus")
+
+      if success then
         if opts.notify then
           vim.notify("Default editor policy set to PychoVIM.", vim.log.levels.INFO, { title = "PychoVIM" })
         end
@@ -97,7 +100,8 @@ function M.make_default(opts)
           { title = "PychoVIM" }
         )
       end
-      if opts.done then opts.done(result.code == 0) end
+
+      if opts.done then opts.done(success) end
     end)
   end)
 end
