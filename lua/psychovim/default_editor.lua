@@ -2,6 +2,7 @@ local M = {}
 
 local cache = { ok = nil, issues = {}, checked_at = 0 }
 local ttl_ns = 5 * 1e9
+local enforcing = false
 
 local function trim(value)
   return (value or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -47,6 +48,12 @@ local function inspect()
   return cache.ok, cache.issues
 end
 
+local function pycho_executable()
+  local pycho = vim.fn.exepath("pycho")
+  if pycho ~= "" then return pycho end
+  return vim.fn.stdpath("config") .. "/bin/pycho"
+end
+
 function M.refresh()
   return inspect()
 end
@@ -62,41 +69,44 @@ function M.is_default(force)
   return ok
 end
 
-function M.make_default(done)
-  local pycho = vim.fn.exepath("pycho")
-  if pycho == "" then
-    pycho = vim.fn.stdpath("config") .. "/bin/pycho"
-  end
+function M.make_default(opts)
+  opts = opts or {}
+  if enforcing then return end
 
-  vim.notify("Restoring default editor policy...", vim.log.levels.INFO, { title = "Pycho System" })
-  vim.system({ pycho, "default-editor" }, { text = true }, function(result)
+  local pycho = pycho_executable()
+  if vim.fn.executable(pycho) ~= 1 then return end
+
+  enforcing = true
+  vim.system({ pycho, "default-editor", "--quiet" }, { text = true }, function(result)
     vim.schedule(function()
+      enforcing = false
       if result.code == 0 then
         vim.env.EDITOR = pycho
         vim.env.VISUAL = pycho
+        vim.env.GIT_EDITOR = pycho
         M.refresh()
         vim.cmd("redrawstatus")
-        vim.notify("PSYCHOVIM is the default text editor again.", vim.log.levels.INFO, { title = "Pycho System" })
-      else
+        if opts.notify then
+          vim.notify("Default editor policy set to PychoVIM.", vim.log.levels.INFO, { title = "PychoVIM" })
+        end
+      elseif opts.notify_errors ~= false then
         local message = trim(result.stderr ~= "" and result.stderr or result.stdout)
-        vim.notify(message ~= "" and message or "Could not restore the default editor.", vim.log.levels.ERROR, { title = "Pycho System" })
+        vim.notify(
+          message ~= "" and message or "Default editor policy could not be applied.",
+          vim.log.levels.ERROR,
+          { title = "PychoVIM" }
+        )
       end
-      if done then done(result.code == 0) end
+      if opts.done then opts.done(result.code == 0) end
     end)
   end)
 end
 
-function M.warn_if_changed()
-  local ok, issues = M.status(true)
-  vim.cmd("redrawstatus")
+function M.enforce()
+  if vim.env.PSYCHOVIM_MAINTENANCE == "1" then return end
+  local ok = M.status(false)
   if ok then return end
-  vim.schedule(function()
-    vim.notify(
-      "Pycho is no longer the full default editor (" .. table.concat(issues, ", ") .. "). Open ⚙ Settings to restore it.",
-      vim.log.levels.WARN,
-      { title = "Pycho System" }
-    )
-  end)
+  M.make_default({ notify = false, notify_errors = true })
 end
 
 return M
