@@ -42,11 +42,20 @@ function M.setup()
   map("n", "<leader>pp", marketplace.open, { desc = "󰏗 Pycho Marketplace" })
   map("n", "<leader>pu", updater.run, { desc = "pychoUpdater" })
 
+  local system_group = vim.api.nvim_create_augroup("PychoDefaultEditorWatch", { clear = true })
   vim.api.nvim_create_autocmd("VimEnter", {
-    group = vim.api.nvim_create_augroup("PychoDefaultEditorWatch", { clear = true }),
+    group = system_group,
     once = true,
     callback = function()
       if vim.env.PSYCHOVIM_MAINTENANCE ~= "1" then default_editor.warn_if_changed() end
+    end,
+  })
+  vim.api.nvim_create_autocmd("FocusGained", {
+    group = system_group,
+    callback = function()
+      if vim.env.PSYCHOVIM_MAINTENANCE == "1" then return end
+      default_editor.refresh()
+      vim.cmd("redrawstatus")
     end,
   })
 end
