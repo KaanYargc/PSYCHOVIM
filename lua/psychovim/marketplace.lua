@@ -1,4 +1,7 @@
-local M = {}
+local M = {
+  source = "Dotfyle",
+  source_url = "https://dotfyle.com/neovim/configurations/plugins",
+}
 
 local state = {
   win = nil,
@@ -9,10 +12,17 @@ local state = {
   loading = false,
   results = {},
   items = {},
+  sorting = "trending",
+  page = 1,
+  last_page = 1,
+  total = 0,
+  category = nil,
+  categories = nil,
 }
 
 local state_dir = vim.fn.stdpath("state") .. "/psychovim"
 local manifest_file = state_dir .. "/marketplace.json"
+local dotfyle_trpc = "https://dotfyle.com/trpc"
 
 local profiles = {
   ["stevearc/oil.nvim"] = {
@@ -108,6 +118,7 @@ local function normalize_entry(entry, kind)
       startup = false,
       opts = {},
       colorscheme = theme_names[repo],
+      source = "legacy",
     }
   end
   if type(entry) ~= "table" or type(entry.repo) ~= "string" then return nil end
@@ -116,6 +127,7 @@ local function normalize_entry(entry, kind)
   entry.enabled = entry.enabled ~= false
   entry.startup = entry.startup == true
   entry.opts = type(entry.opts) == "table" and entry.opts or {}
+  entry.source = type(entry.source) == "string" and entry.source or "marketplace"
   if entry.kind == "theme" and (not entry.colorscheme or entry.colorscheme == "") then
     entry.colorscheme = theme_names[entry.repo]
   end
@@ -123,16 +135,16 @@ local function normalize_entry(entry, kind)
 end
 
 local function normalize_manifest(decoded)
-  local result = { version = 2, installed = {}, active_theme = nil }
+  local result = { version = 3, installed = {}, active_theme = nil }
   if type(decoded) ~= "table" then return result, true end
 
-  if decoded.version == 2 then
+  if decoded.version == 2 or decoded.version == 3 then
     for _, entry in ipairs(decoded.installed or {}) do
       local normalized = normalize_entry(entry)
       if normalized then result.installed[#result.installed + 1] = normalized end
     end
     result.active_theme = decoded.active_theme
-    return result, false
+    return result, decoded.version ~= 3
   end
 
   for _, entry in ipairs(decoded.installed or {}) do
@@ -148,12 +160,12 @@ end
 
 local function load_manifest()
   if vim.fn.filereadable(manifest_file) ~= 1 then
-    return { version = 2, installed = {}, active_theme = nil }
+    return { version = 3, installed = {}, active_theme = nil }
   end
   local ok_read, raw = pcall(vim.fn.readfile, manifest_file)
-  if not ok_read then return { version = 2, installed = {}, active_theme = nil } end
+  if not ok_read then return { version = 3, installed = {}, active_theme = nil } end
   local ok_json, decoded = pcall(vim.json.decode, table.concat(raw, "\n"))
-  if not ok_json then return { version = 2, installed = {}, active_theme = nil } end
+  if not ok_json then return { version = 3, installed = {}, active_theme = nil } end
   local data, migrated = normalize_manifest(decoded)
   if migrated then save_manifest(data) end
   return data
@@ -204,17 +216,18 @@ local function installed_inventory()
   local data = load_manifest()
   local result = {}
   local market = entry_map(data)
-  local core, core_seen = core_inventory()
+  local core = core_inventory()
 
   for _, entry in ipairs(data.installed or {}) do
     result[#result + 1] = {
       name = entry.repo:match("/([^/]+)$") or entry.repo,
       repo = entry.repo,
       kind = entry.kind,
-      origin = "MARKET",
+      origin = entry.source == "dotfyle" and "DOTFYLE" or "MARKET",
       installed = true,
       enabled = entry.enabled,
       active = data.active_theme == entry.repo,
+      category = entry.category,
       desc = entry.kind == "theme" and (entry.colorscheme or "theme") or "Marketplace extension",
     }
   end
@@ -223,10 +236,15 @@ local function installed_inventory()
   end
 
   table.sort(result, function(a, b)
-    if a.origin ~= b.origin then return a.origin == "MARKET" end
+    if a.origin ~= b.origin then
+      if a.origin == "DOTFYLE" then return true end
+      if b.origin == "DOTFYLE" then return false end
+      if a.origin == "MARKET" then return true end
+      if b.origin == "MARKET" then return false end
+    end
     return a.repo:lower() < b.repo:lower()
   end)
-  return result, core_seen
+  return result
 end
 
 local function url_encode(value)
@@ -235,54 +253,111 @@ local function url_encode(value)
   end))
 end
 
-local function github_search(query, kind, done)
+local function trpc_payload(decoded)
+  if type(decoded) ~= "table" then return nil, "Dotfyle returned unreadable data" end
+  if decoded.error then
+    local message = decoded.error.message
+      or (decoded.error.json and decoded.error.json.message)
+      or "Dotfyle request failed"
+    return nil, message
+  end
+  local result = decoded.result and decoded.result.data or nil
+  if type(result) == "table" and result.json ~= nil then result = result.json end
+  if result == nil then return nil, "Dotfyle response had no result" end
+  return result, nil
+end
+
+local function dotfyle_query(procedure, input, done)
   if vim.fn.executable("curl") ~= 1 then
-    done(nil, "curl is required for GitHub search")
+    done(nil, "curl is required for Dotfyle marketplace search")
     return
   end
 
-  local qualifier = kind == "theme" and "topic:neovim-colorscheme" or "topic:neovim-plugin"
-  local q = trim(query)
-  if q ~= "" then q = q .. " in:name,description " .. qualifier else q = qualifier end
-  local url = "https://api.github.com/search/repositories?q=" .. url_encode(q) .. "&sort=stars&order=desc&per_page=30"
-  local argv = {
-    "curl", "-fsSL", "--connect-timeout", "8", "--max-time", "20",
-    "-H", "Accept: application/vnd.github+json",
-    "-H", "X-GitHub-Api-Version: 2022-11-28",
-  }
-  local token = vim.env.GITHUB_TOKEN or vim.env.GH_TOKEN
-  if token and token ~= "" then
-    vim.list_extend(argv, { "-H", "Authorization: Bearer " .. token })
+  local url = dotfyle_trpc .. "/" .. procedure
+  if input ~= nil then
+    local ok, encoded = pcall(vim.json.encode, input)
+    if not ok then done(nil, "Could not encode Dotfyle query"); return end
+    url = url .. "?input=" .. url_encode(encoded)
   end
-  argv[#argv + 1] = url
+
+  local argv = {
+    "curl", "-fsSL", "--retry", "2", "--retry-delay", "1",
+    "--connect-timeout", "8", "--max-time", "25",
+    "-H", "Accept: application/json",
+    "-H", "User-Agent: PychoVIM/marketplace",
+    url,
+  }
 
   vim.system(argv, { text = true }, function(result)
     vim.schedule(function()
       if result.code ~= 0 then
-        done(nil, trim(result.stderr) ~= "" and trim(result.stderr) or "GitHub search failed")
+        done(nil, trim(result.stderr) ~= "" and trim(result.stderr) or "Dotfyle request failed")
         return
       end
       local ok, decoded = pcall(vim.json.decode, result.stdout or "")
-      if not ok or type(decoded) ~= "table" then
-        done(nil, "GitHub returned unreadable search data")
-        return
-      end
-      local rows = {}
-      for _, repo in ipairs(decoded.items or {}) do
-        if not repo.archived and type(repo.full_name) == "string" then
-          rows[#rows + 1] = {
-            name = repo.name or repo.full_name,
-            repo = repo.full_name,
-            kind = kind,
-            stars = repo.stargazers_count or 0,
-            desc = repo.description or "",
-            installed = false,
-            origin = "GITHUB",
-          }
-        end
-      end
-      done(rows, nil)
+      if not ok then done(nil, "Dotfyle returned invalid JSON"); return end
+      local payload, err = trpc_payload(decoded)
+      done(payload, err)
     end)
+  end)
+end
+
+local function dotfyle_search(query, kind, done)
+  local categories = {}
+  if kind == "theme" then
+    categories = { "colorscheme" }
+  elseif state.category and state.category ~= "" then
+    categories = { state.category }
+  end
+
+  dotfyle_query("searchPlugins", {
+    query = trim(query) ~= "" and trim(query) or nil,
+    categories = categories,
+    sorting = state.sorting,
+    page = state.page,
+    take = 10,
+  }, function(payload, err)
+    if not payload then done(nil, err); return end
+    if type(payload.data) ~= "table" then done(nil, "Dotfyle search payload was incomplete"); return end
+
+    local rows = {}
+    for _, plugin in ipairs(payload.data) do
+      if type(plugin.owner) == "string" and type(plugin.name) == "string" then
+        local repo = plugin.owner .. "/" .. plugin.name
+        rows[#rows + 1] = {
+          name = plugin.name,
+          repo = repo,
+          kind = (kind == "theme" or plugin.category == "colorscheme") and "theme" or "plugin",
+          category = plugin.category or "",
+          stars = tonumber(plugin.stars) or 0,
+          installs = tonumber(plugin.configCount) or 0,
+          trend = tonumber(plugin.addedLastWeek) or 0,
+          desc = plugin.shortDescription or plugin.description or "",
+          installed = false,
+          origin = "DOTFYLE",
+          clone_url = plugin.link,
+          dotfyle_id = plugin.id,
+        }
+      end
+    end
+
+    local meta = type(payload.meta) == "table" and payload.meta or {}
+    done(rows, nil, {
+      total = tonumber(meta.total) or #rows,
+      current = tonumber(meta.currentPage) or state.page,
+      last = math.max(1, tonumber(meta.lastPage) or 1),
+    })
+  end)
+end
+
+local function load_categories(done)
+  if state.categories then done(state.categories); return end
+  dotfyle_query("listPluginCategories", nil, function(payload, err)
+    if not payload then done(nil, err); return end
+    if type(payload) ~= "table" then done(nil, "Dotfyle category list was incomplete"); return end
+    table.sort(payload)
+    state.categories = payload
+    done(payload)
   end)
 end
 
@@ -346,7 +421,8 @@ local function refresh_items()
     for _, item in ipairs(state.items) do
       local entry = market[item.repo:lower()]
       item.installed = entry ~= nil or core[item.repo:lower()] == true
-      item.origin = entry and "MARKET" or (core[item.repo:lower()] and "CORE" or "GITHUB")
+      item.origin = entry and (entry.source == "dotfyle" and "DOTFYLE" or "MARKET")
+        or (core[item.repo:lower()] and "CORE" or "DOTFYLE")
       item.enabled = entry and entry.enabled or true
       item.active = entry and data.active_theme == entry.repo or false
     end
@@ -354,21 +430,35 @@ local function refresh_items()
   if state.row > #state.items then state.row = math.max(1, #state.items) end
 end
 
+local function mode_label()
+  if state.mode == "installed" then return "INSTALLED" end
+  if state.mode == "themes" then return "THEMES" end
+  return "PLUGINS"
+end
+
+local function sort_label()
+  if state.sorting == "popular" then return "TOP" end
+  return state.sorting:upper()
+end
+
 local function render()
   if not state.buf or not vim.api.nvim_buf_is_valid(state.buf) then return end
   refresh_items()
 
-  local mode = state.mode == "installed" and "INSTALLED" or (state.mode == "themes" and "THEMES" or "SEARCH")
+  local category = state.mode == "themes" and "colorscheme" or (state.category or "all")
+  local page = state.mode == "installed" and "local" or string.format("%d/%d · %d", state.page, state.last_page, state.total)
+  local query = state.query ~= "" and (" · q=" .. trunc(state.query, 24)) or ""
   local lines = {
-    "  󰏗 PYCHOVIM EXTENSIONS",
-    string.format("  %-11s  i inventory   / plugins   t themes   s settings", mode),
+    "  󰏗 PYCHOVIM EXTENSIONS // DOTFYLE",
+    string.format("  %-10s %-8s category:%-18s page:%s%s", mode_label(), sort_label(), category, page, query),
+    "  i inventory   d discover   / search   t themes   f category   1 trending  2 top  3 new",
     "",
   }
 
   if state.loading then
-    lines[#lines + 1] = "    Searching GitHub..."
+    lines[#lines + 1] = "    Querying Dotfyle..."
   elseif #state.items == 0 then
-    lines[#lines + 1] = state.mode == "installed" and "    No extensions found." or "    No GitHub results."
+    lines[#lines + 1] = state.mode == "installed" and "    No extensions found." or "    No Dotfyle results."
   else
     for _, item in ipairs(state.items) do
       local icon = item.kind == "theme" and "󰏘" or "󰏗"
@@ -382,21 +472,24 @@ local function render()
       else
         status = "GET"
       end
-      local stars = item.stars and item.stars > 0 and ("★" .. tostring(item.stars)) or ""
+      local metric = ""
+      if item.installs and item.installs > 0 then metric = "cfg:" .. tostring(item.installs) end
+      if item.stars and item.stars > 0 then metric = trim(metric .. " ★" .. tostring(item.stars)) end
+      if item.trend and item.trend > 0 then metric = trim(metric .. " +" .. tostring(item.trend) .. "/wk") end
       lines[#lines + 1] = string.format(
-        "    %s %-28s %-7s %-8s %s",
+        "    %s %-30s %-7s %-20s %s",
         icon,
-        trunc(item.repo, 28),
+        trunc(item.repo, 30),
         status,
-        stars,
-        trunc(item.desc, 36)
+        trunc(metric ~= "" and metric or (item.category or ""), 20),
+        trunc(item.desc, 34)
       )
     end
   end
 
   lines[#lines + 1] = ""
-  lines[#lines + 1] = "  enter install/remove   c configure   r refresh   u update"
-  lines[#lines + 1] = "  GitHub search is live. Marketplace state survives PychoVIM updates."
+  lines[#lines + 1] = "  enter install/configure   c config   [ prev   ] next   r refresh   u update   q close"
+  lines[#lines + 1] = "  Catalog: dotfyle.com · installs are GitHub repos managed by PychoVIM/Lazy."
 
   vim.bo[state.buf].modifiable = true
   vim.api.nvim_buf_set_lines(state.buf, 0, -1, false, lines)
@@ -408,11 +501,11 @@ local function render()
       or (item.origin == "CORE" and "Comment")
       or (item.installed and "DiagnosticInfo")
       or nil
-    if hl then vim.api.nvim_buf_add_highlight(state.buf, -1, hl, 2 + index, 4, -1) end
+    if hl then vim.api.nvim_buf_add_highlight(state.buf, -1, hl, 3 + index, 4, -1) end
   end
 
   if state.win and vim.api.nvim_win_is_valid(state.win) and #state.items > 0 then
-    vim.api.nvim_win_set_cursor(state.win, { 3 + state.row, 4 })
+    vim.api.nvim_win_set_cursor(state.win, { 4 + state.row, 4 })
   end
 end
 
@@ -430,11 +523,15 @@ local function find_entry(repo)
   return data, nil, nil
 end
 
-local function clone_repo(repo, done)
-  local dir = repo_dir(repo)
+local function clone_repo(item, done)
+  local dir = repo_dir(item.repo)
   if vim.uv.fs_stat(dir) then done(true); return end
   vim.fn.mkdir(vim.fn.stdpath("data") .. "/lazy", "p")
-  vim.system({ "git", "clone", "--filter=blob:none", "https://github.com/" .. repo .. ".git", dir }, { text = true }, function(result)
+  local source = item.clone_url
+  if type(source) ~= "string" or not source:match("^https://github%.com/") then
+    source = "https://github.com/" .. item.repo .. ".git"
+  end
+  vim.system({ "git", "clone", "--filter=blob:none", source, dir }, { text = true }, function(result)
     vim.schedule(function() done(result.code == 0, trim(result.stderr)) end)
   end)
 end
@@ -460,14 +557,13 @@ local function set_active_theme(entry)
     require("psychovim.theme").apply(vim.g.psychovim_mask or "sanity")
     vim.notify((entry.colorscheme or entry.repo) .. " applied.", vim.log.levels.INFO, { title = "PychoVIM Themes" })
   else
-    vim.notify("Theme installed; colorscheme name needs configuration.", vim.log.levels.WARN, { title = "PychoVIM Themes" })
+    vim.notify("Theme installed; set its :colorscheme name in config.", vim.log.levels.WARN, { title = "PychoVIM Themes" })
   end
   render()
 end
 
 local function configure_entry(item)
   if item.origin == "CORE" then
-    vim.notify("Core extension policy lives in ⚙ PychoVIM Settings.", vim.log.levels.INFO, { title = "PychoVIM Extensions" })
     require("psychovim.settings").open()
     return
   end
@@ -532,11 +628,8 @@ local function install_result(item)
     return
   end
 
-  local data, existing = find_entry(item.repo)
-  if existing then
-    remove_market_entry(item.repo)
-    return
-  end
+  local _, existing = find_entry(item.repo)
+  if existing then configure_entry(item); return end
 
   local function commit_entry(colorscheme)
     local fresh = load_manifest()
@@ -547,18 +640,21 @@ local function install_result(item)
       startup = item.kind == "theme",
       opts = {},
       colorscheme = colorscheme,
+      source = "dotfyle",
+      category = item.category,
+      dotfyle_id = item.dotfyle_id,
     }
     if item.kind == "theme" then fresh.active_theme = item.repo end
     save_manifest(fresh)
 
     vim.notify("Downloading " .. item.repo .. "...", vim.log.levels.INFO, { title = "PychoVIM Extensions" })
-    clone_repo(item.repo, function(ok, err)
+    clone_repo(item, function(ok, err)
       if not ok then
         remove_market_entry(item.repo)
         vim.notify(err ~= "" and err or "Download failed.", vim.log.levels.ERROR, { title = "PychoVIM Extensions" })
         return
       end
-      vim.notify("Installed. Restart PychoVIM to load " .. item.repo .. ".", vim.log.levels.INFO, { title = "PychoVIM Extensions" })
+      vim.notify("Installed from Dotfyle. Restart PychoVIM to load " .. item.repo .. ".", vim.log.levels.INFO, { title = "PychoVIM Extensions" })
       render()
     end)
   end
@@ -566,7 +662,7 @@ local function install_result(item)
   if item.kind == "theme" then
     local guessed = theme_names[item.repo]
     if guessed then commit_entry(guessed); return end
-    vim.ui.input({ prompt = "colorscheme command for " .. item.repo .. ": ", default = item.name or "" }, function(value)
+    vim.ui.input({ prompt = "colorscheme command for " .. item.repo .. ": ", default = "" }, function(value)
       value = trim(value)
       if value ~= "" then commit_entry(value) end
     end)
@@ -578,40 +674,93 @@ end
 local function activate_current()
   local item = state.items[state.row]
   if not item then return end
-  if state.mode == "installed" then
-    if item.origin == "MARKET" then configure_entry(item) else configure_entry(item) end
-  elseif item.installed then
+  if state.mode == "installed" or item.installed then
     configure_entry(item)
   else
     install_result(item)
   end
 end
 
-local function search(kind, reuse)
-  local function run(query)
-    state.mode = kind == "theme" and "themes" or "search"
-    state.query = query or ""
-    state.loading = true
-    state.results = {}
-    state.row = 1
+local function run_remote(kind)
+  state.mode = kind == "theme" and "themes" or "plugins"
+  state.loading = true
+  state.results = {}
+  state.row = 1
+  render()
+  dotfyle_search(state.query, kind, function(rows, err, meta)
+    state.loading = false
+    if not rows then
+      vim.notify(err or "Dotfyle search failed.", vim.log.levels.ERROR, { title = "PychoVIM Extensions" })
+      state.results = {}
+      state.total = 0
+      state.last_page = 1
+    else
+      state.results = rows
+      state.total = meta.total
+      state.page = meta.current
+      state.last_page = meta.last
+    end
     render()
-    github_search(state.query, kind, function(rows, err)
-      state.loading = false
-      if not rows then
-        vim.notify(err or "GitHub search failed.", vim.log.levels.ERROR, { title = "PychoVIM Extensions" })
-        state.results = {}
-      else
-        state.results = rows
-      end
-      render()
-    end)
-  end
-
-  if reuse and state.mode ~= "installed" then run(state.query); return end
-  vim.ui.input({ prompt = kind == "theme" and "Search themes: " or "Search extensions: " }, function(query)
-    if query == nil then return end
-    run(trim(query))
   end)
+end
+
+local function discover(kind, reset_query)
+  if reset_query then state.query = "" end
+  state.page = 1
+  if kind == "theme" then state.category = nil end
+  run_remote(kind)
+end
+
+local function search_current()
+  local kind = state.mode == "themes" and "theme" or "plugin"
+  vim.ui.input({ prompt = kind == "theme" and "Search Dotfyle themes: " or "Search Dotfyle plugins: ", default = state.query }, function(query)
+    if query == nil then return end
+    state.query = trim(query)
+    state.page = 1
+    run_remote(kind)
+  end)
+end
+
+local function set_sorting(sorting)
+  state.sorting = sorting
+  state.page = 1
+  if state.mode == "installed" then
+    discover("plugin", true)
+  else
+    run_remote(state.mode == "themes" and "theme" or "plugin")
+  end
+end
+
+local function choose_category()
+  if state.mode == "themes" then
+    vim.notify("Themes are already filtered to Dotfyle's colorscheme category.", vim.log.levels.INFO, { title = "PychoVIM Extensions" })
+    return
+  end
+  load_categories(function(categories, err)
+    if not categories then
+      vim.notify(err or "Could not load Dotfyle categories.", vim.log.levels.ERROR, { title = "PychoVIM Extensions" })
+      return
+    end
+    local choices = { "All categories" }
+    for _, category in ipairs(categories) do
+      if category ~= "colorscheme" then choices[#choices + 1] = category end
+    end
+    vim.ui.select(choices, { prompt = "Dotfyle category" }, function(choice)
+      if not choice then return end
+      state.category = choice == "All categories" and nil or choice
+      state.page = 1
+      state.query = ""
+      run_remote("plugin")
+    end)
+  end)
+end
+
+local function change_page(delta)
+  if state.mode == "installed" or state.loading then return end
+  local next_page = math.max(1, math.min(state.last_page, state.page + delta))
+  if next_page == state.page then return end
+  state.page = next_page
+  run_remote(state.mode == "themes" and "theme" or "plugin")
 end
 
 function M.open(opts)
@@ -629,8 +778,8 @@ function M.open(opts)
   vim.bo[state.buf].bufhidden = "wipe"
   vim.bo[state.buf].swapfile = false
 
-  local width = math.max(68, math.min(118, vim.o.columns - 4))
-  local height = math.max(14, math.min(36, vim.o.lines - 4))
+  local width = math.max(76, math.min(124, vim.o.columns - 4))
+  local height = math.max(16, math.min(38, vim.o.lines - 4))
   state.win = vim.api.nvim_open_win(state.buf, true, {
     relative = "editor",
     width = width,
@@ -639,7 +788,7 @@ function M.open(opts)
     col = math.max(0, math.floor((vim.o.columns - width) / 2)),
     style = "minimal",
     border = require("psychovim.settings").get("popup_border") or "rounded",
-    title = " 󰏗 PYCHOVIM EXTENSIONS ",
+    title = " 󰏗 PYCHOVIM EXTENSIONS // DOTFYLE ",
     title_pos = "center",
     noautocmd = true,
   })
@@ -657,11 +806,18 @@ function M.open(opts)
     local item = state.items[state.row]
     if item then configure_entry(item) end
   end, map_opts)
-  vim.keymap.set("n", "i", function() state.mode = "installed"; state.row = 1; render() end, map_opts)
-  vim.keymap.set("n", "/", function() search("plugin", false) end, map_opts)
-  vim.keymap.set("n", "t", function() search("theme", false) end, map_opts)
+  vim.keymap.set("n", "i", function() state.mode = "installed"; state.row = 1; state.query = ""; render() end, map_opts)
+  vim.keymap.set("n", "d", function() discover("plugin", true) end, map_opts)
+  vim.keymap.set("n", "/", search_current, map_opts)
+  vim.keymap.set("n", "t", function() discover("theme", true) end, map_opts)
+  vim.keymap.set("n", "f", choose_category, map_opts)
+  vim.keymap.set("n", "1", function() set_sorting("trending") end, map_opts)
+  vim.keymap.set("n", "2", function() set_sorting("popular") end, map_opts)
+  vim.keymap.set("n", "3", function() set_sorting("new") end, map_opts)
+  vim.keymap.set("n", "[", function() change_page(-1) end, map_opts)
+  vim.keymap.set("n", "]", function() change_page(1) end, map_opts)
   vim.keymap.set("n", "r", function()
-    if state.mode == "installed" then render() else search(state.mode == "themes" and "theme" or "plugin", true) end
+    if state.mode == "installed" then render() else run_remote(state.mode == "themes" and "theme" or "plugin") end
   end, map_opts)
   vim.keymap.set("n", "s", function() require("psychovim.settings").open() end, map_opts)
   vim.keymap.set("n", "u", function() require("psychovim.updater").run() end, map_opts)
@@ -670,12 +826,21 @@ function M.open(opts)
   render()
 end
 
+function M.search(query, opts)
+  opts = opts or {}
+  state.query = trim(query or "")
+  state.sorting = opts.sorting or state.sorting
+  state.category = opts.category
+  state.page = opts.page or 1
+  run_remote(opts.kind == "theme" and "theme" or "plugin")
+end
+
 function M.setup()
   if vim.fn.exists(":PychoMarketplace") == 0 then
-    vim.api.nvim_create_user_command("PychoMarketplace", M.open, { desc = "Open PychoVIM Extensions" })
+    vim.api.nvim_create_user_command("PychoMarketplace", M.open, { desc = "Open PychoVIM Extensions / Dotfyle" })
   end
   if vim.fn.exists(":PychoExtensions") == 0 then
-    vim.api.nvim_create_user_command("PychoExtensions", M.open, { desc = "Open PychoVIM Extensions" })
+    vim.api.nvim_create_user_command("PychoExtensions", M.open, { desc = "Open PychoVIM Extensions / Dotfyle" })
   end
   if vim.fn.exists(":PychoInventory") == 0 then
     vim.api.nvim_create_user_command("PychoInventory", function() M.open({ installed = true }) end, { desc = "Open installed PychoVIM extensions" })
