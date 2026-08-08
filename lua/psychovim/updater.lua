@@ -1,49 +1,106 @@
 local M = {}
 
+local state = { running = false }
+
 local function pycho_executable()
   local path = vim.fn.exepath("pycho")
   if path ~= "" then return path end
   return vim.fn.stdpath("config") .. "/bin/pycho"
 end
 
-function M.run()
-  vim.notify("Checking config, plugins, tools and parsers...", vim.log.levels.INFO, { title = "pychoUpdater" })
-  vim.system({ pycho_executable(), "update" }, { text = true }, function(result)
-    vim.schedule(function()
-      local output = (result.stdout or ""):gsub("%s+$", "")
-      if result.code == 0 then
-        vim.notify(output ~= "" and output or "Update complete.", vim.log.levels.INFO, { title = "pychoUpdater" })
-      else
-        local err = (result.stderr or ""):gsub("%s+$", "")
-        vim.notify(err ~= "" and err or output ~= "" and output or "Update failed.", vim.log.levels.ERROR, { title = "pychoUpdater" })
-      end
-    end)
+local function notify(message, level)
+  if not message or message == "" then return end
+  vim.schedule(function()
+    vim.notify(message, level or vim.log.levels.INFO, { title = "pychoUpdater" })
   end)
 end
 
-function M.notice()
-  local message = vim.env.PSYCHOVIM_UPDATER_NOTICE
-  if not message or message == "" then return end
-  local warning = vim.env.PSYCHOVIM_UPDATER_WARNING == "1"
-  vim.env.PSYCHOVIM_UPDATER_NOTICE = nil
-  vim.env.PSYCHOVIM_UPDATER_WARNING = nil
-  vim.schedule(function()
-    vim.notify(message, warning and vim.log.levels.WARN or vim.log.levels.INFO, { title = "pychoUpdater" })
-  end)
+local function auto_enabled()
+  local settings = require("psychovim.settings")
+  return settings.get("auto_update_config") == true
+    or settings.get("auto_update_plugins") == true
+    or settings.get("auto_update_parsers") == true
+end
+
+local function handle_phase(line, terminal)
+  local kind, message = line:match("^@@PYCHO|([^|]+)|(.+)$")
+  if not kind then return end
+
+  local level = vim.log.levels.INFO
+  if kind == "warn" then level = vim.log.levels.WARN end
+  if kind == "error" then level = vim.log.levels.ERROR end
+  if kind == "done" or kind == "warn" or kind == "error" then terminal.value = true end
+
+  notify(message, level)
+end
+
+function M.run(opts)
+  opts = opts or {}
+  if state.running then
+    notify("Update already running.")
+    return
+  end
+  if opts.auto and not auto_enabled() then return end
+
+  local pycho = pycho_executable()
+  if vim.fn.executable(pycho) ~= 1 then
+    notify("pycho launcher not found.", vim.log.levels.ERROR)
+    return
+  end
+
+  state.running = true
+  local terminal = { value = false }
+  notify("Checking updates...")
+
+  local command = { pycho, opts.auto and "auto-update" or "update", "--ui-stream" }
+  local job = vim.fn.jobstart(command, {
+    stdout_buffered = false,
+    stderr_buffered = true,
+    on_stdout = function(_, data)
+      for _, line in ipairs(data or {}) do
+        if line ~= "" then handle_phase(line, terminal) end
+      end
+    end,
+    on_stderr = function(_, data)
+      if not data then return end
+      local text = table.concat(data, "\n"):gsub("%s+$", "")
+      if text ~= "" then vim.g.pycho_updater_last_error = text end
+    end,
+    on_exit = function(_, code)
+      state.running = false
+      if code ~= 0 and not terminal.value then
+        local message = vim.g.pycho_updater_last_error
+        vim.g.pycho_updater_last_error = nil
+        notify(message and message ~= "" and message or "Update failed. See ~/.cache/psychovim/.", vim.log.levels.ERROR)
+      elseif code == 0 and not terminal.value then
+        notify("PSYCHOVIM is current.")
+      end
+    end,
+  })
+
+  if job <= 0 then
+    state.running = false
+    notify("Could not start updater.", vim.log.levels.ERROR)
+  end
 end
 
 function M.setup()
   if vim.fn.exists(":PychoUpdate") == 0 then
-    vim.api.nvim_create_user_command("PychoUpdate", M.run, { desc = "Run pychoUpdater now" })
+    vim.api.nvim_create_user_command("PychoUpdate", function() M.run() end, { desc = "Run pychoUpdate now" })
   end
   if vim.fn.exists(":PychoUpdater") == 0 then
-    vim.api.nvim_create_user_command("PychoUpdater", M.run, { desc = "Run pychoUpdater now" })
+    vim.api.nvim_create_user_command("PychoUpdater", function() M.run() end, { desc = "Run pychoUpdater now" })
   end
 
   vim.api.nvim_create_autocmd("VimEnter", {
-    group = vim.api.nvim_create_augroup("PychoUpdaterNotice", { clear = true }),
+    group = vim.api.nvim_create_augroup("PychoUpdater", { clear = true }),
     once = true,
-    callback = M.notice,
+    callback = function()
+      if vim.env.PSYCHOVIM_MAINTENANCE == "1" then return end
+      if vim.env.PSYCHOVIM_AUTOUPDATE_REQUEST ~= "1" then return end
+      vim.env.PSYCHOVIM_AUTOUPDATE_REQUEST = nil
+      vim.defer_fn(function() M.run({ auto = true }) end, 120)
+    end,
   })
 end
 
