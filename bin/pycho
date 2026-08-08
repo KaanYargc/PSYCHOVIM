@@ -43,9 +43,17 @@ migrate_legacy_lockfile() {
   local old="$CONFIG_DIR/lazy-lock.json"
   local new="$STATE_HOME/nvim/psychovim/lazy-lock.json"
   [[ -f "$old" ]] || return 0
-  if git -C "$CONFIG_DIR" ls-files --error-unmatch lazy-lock.json >/dev/null 2>&1; then return 0; fi
   mkdir -p "$(dirname "$new")"
   if [[ ! -f "$new" ]]; then mv "$old" "$new"; else rm -f "$old"; fi
+}
+
+filtered_config_status() {
+  git -C "$CONFIG_DIR" status --porcelain --untracked-files=all 2>/dev/null \
+    | grep -vE '^\?\? lazy-lock\.json$' || true
+}
+
+config_dirty() {
+  [[ -n "$(filtered_config_status)" ]]
 }
 
 repair_plugin_checkout() {
@@ -83,7 +91,6 @@ sync_plugins() {
 sync_tools() {
   mkdir -p "$CACHE_DIR"
   : > "$TOOL_LOG"
-
   if ! tooling_enabled; then
     say "tools        off in settings"
     return 0
@@ -94,7 +101,6 @@ sync_tools() {
     say "tools        ${green}ok${reset}"
     return 0
   fi
-
   say "tools        ${yellow}incomplete${reset}"
   say "log          $TOOL_LOG"
   return 1
@@ -103,7 +109,6 @@ sync_tools() {
 sync_parsers() {
   mkdir -p "$CACHE_DIR"
   : > "$PARSER_LOG"
-
   if ! setting_on treesitter true; then
     say "parsers      off in settings"
     return 0
@@ -120,23 +125,17 @@ sync_parsers() {
     say "parsers      ${green}ok${reset}"
     return 0
   fi
-
   say "parsers      ${yellow}incomplete${reset}"
   say "log          $PARSER_LOG"
   return 1
 }
 
-config_dirty() {
-  [[ -n "$(git -C "$CONFIG_DIR" status --porcelain 2>/dev/null || true)" ]]
-}
-
 update_config_strict() {
   [[ -d "$CONFIG_DIR/.git" ]] || die "$CONFIG_DIR is not a git checkout"
   migrate_legacy_lockfile
-
   if config_dirty; then
     say "config       ${yellow}dirty${reset}"
-    git -C "$CONFIG_DIR" status --short
+    filtered_config_status
     die "refusing to update over local config changes"
   fi
 
@@ -147,7 +146,6 @@ update_config_strict() {
   git -C "$CONFIG_DIR" checkout -q "$BRANCH"
   git -C "$CONFIG_DIR" merge --ff-only "origin/$BRANCH"
   after="$(git -C "$CONFIG_DIR" rev-parse HEAD)"
-
   if [[ "$before" == "$after" ]]; then
     say "config       ${green}current${reset}"
   else
@@ -165,6 +163,7 @@ update_config_soft() {
   migrate_legacy_lockfile
   if config_dirty; then
     say "config       ${yellow}local changes; skipped${reset}"
+    filtered_config_status
     return 0
   fi
 
@@ -179,7 +178,6 @@ update_config_soft() {
     return 1
   fi
   after="$(git -C "$CONFIG_DIR" rev-parse HEAD 2>/dev/null || true)"
-
   if [[ "$before" == "$after" ]]; then
     say "config       ${green}current${reset}"
   else
@@ -188,32 +186,111 @@ update_config_soft() {
   fi
 }
 
+profile_without_pycho_block() {
+  local profile="$1" temp
+  [[ -f "$profile" ]] || : > "$profile"
+  temp="$(mktemp)"
+  awk '
+    $0 == "# >>> PSYCHOVIM default editor >>>" { skip=1; next }
+    $0 == "# <<< PSYCHOVIM default editor <<<" { skip=0; next }
+    !skip { print }
+  ' "$profile" > "$temp"
+  cat "$temp" > "$profile"
+  rm -f "$temp"
+}
+
+make_default_editor() {
+  local launcher shell_name profile desktop_dir desktop_file rc=0
+  launcher="$(command -v pycho 2>/dev/null || true)"
+  [[ -n "$launcher" ]] || launcher="$CONFIG_DIR/bin/pycho"
+  [[ -x "$launcher" ]] || die "pycho launcher not found"
+
+  shell_name="$(basename "${SHELL:-bash}")"
+  case "$shell_name" in
+    zsh) profile="$HOME/.zshrc" ;;
+    *) profile="$HOME/.bashrc" ;;
+  esac
+  profile_without_pycho_block "$profile"
+  cat >> "$profile" <<EOF
+
+# >>> PSYCHOVIM default editor >>>
+export EDITOR=$(printf '%q' "$launcher")
+export VISUAL=$(printf '%q' "$launcher")
+# <<< PSYCHOVIM default editor <<<
+EOF
+
+  if command -v git >/dev/null 2>&1; then
+    git config --global core.editor "$launcher" || rc=1
+  fi
+
+  if [[ "$(uname -s)" == "Linux" ]]; then
+    desktop_dir="$DATA_HOME/applications"
+    desktop_file="$desktop_dir/psychovim.desktop"
+    mkdir -p "$desktop_dir"
+    cat > "$desktop_file" <<EOF
+[Desktop Entry]
+Type=Application
+Name=PSYCHOVIM
+Comment=Pycho text editor
+Exec="$launcher" %F
+TryExec=$launcher
+Terminal=true
+NoDisplay=true
+Categories=Utility;TextEditor;
+MimeType=text/plain;
+EOF
+    if command -v update-desktop-database >/dev/null 2>&1; then
+      update-desktop-database "$desktop_dir" >/dev/null 2>&1 || true
+    fi
+    if command -v xdg-mime >/dev/null 2>&1; then
+      xdg-mime default psychovim.desktop text/plain || rc=1
+    else
+      say "${yellow}default editor:${reset} xdg-mime missing; shell/Git defaults were still set"
+      rc=1
+    fi
+  fi
+
+  export EDITOR="$launcher"
+  export VISUAL="$launcher"
+  if (( rc == 0 )); then
+    say "default editor ${green}PSYCHOVIM${reset}"
+  else
+    say "${yellow}default editor partially configured${reset}"
+  fi
+  return "$rc"
+}
+
 startup_update() {
   [[ "${PSYCHOVIM_NO_AUTOUPDATE:-0}" == "1" ]] && return 0
-
-  local do_config=false do_plugins=false do_parsers=false
+  local do_config=false do_plugins=false do_parsers=false warning=0
   setting_on auto_update_config true && do_config=true
   setting_on auto_update_plugins true && do_plugins=true
   setting_on auto_update_parsers true && do_parsers=true
-
   if ! $do_config && ! $do_plugins && ! $do_parsers; then return 0; fi
 
   resolve_nvim
-  say "${red}${bold}PSYCHOVIM${reset} // CHECK"
-  $do_config && update_config_soft || true
+  say "${red}${bold}pychoUpdater${reset} // CHECK"
+  if $do_config; then update_config_soft || warning=1; fi
   if $do_plugins; then
-    sync_plugins 1 || true
-    sync_tools || true
+    sync_plugins 1 || warning=1
+    sync_tools || warning=1
   fi
-  $do_parsers && sync_parsers || true
+  if $do_parsers; then sync_parsers || warning=1; fi
   say ""
+
+  if (( warning == 0 )); then
+    export PSYCHOVIM_UPDATER_NOTICE="Config, plugins, tools and parsers are current."
+    export PSYCHOVIM_UPDATER_WARNING=0
+  else
+    export PSYCHOVIM_UPDATER_NOTICE="Update check finished with warnings. See ~/.cache/psychovim/ for logs."
+    export PSYCHOVIM_UPDATER_WARNING=1
+  fi
 }
 
 update_psychovim() {
   resolve_nvim
   command -v git >/dev/null 2>&1 || die "git is required"
-
-  say "${red}${bold}PSYCHOVIM${reset} // UPDATE"
+  say "${red}${bold}pychoUpdater${reset} // UPDATE"
   update_config_strict
 
   local rc=0
@@ -222,18 +299,19 @@ update_psychovim() {
   sync_parsers || rc=1
   say ""
   if (( rc == 0 )); then
-    say "${green}updated.${reset}"
+    say "${green}pychoUpdate complete.${reset}"
   else
-    say "${yellow}updated with network scars.${reset} logs: $CACHE_DIR"
+    say "${yellow}pychoUpdate completed with warnings.${reset} logs: $CACHE_DIR"
   fi
+  return "$rc"
 }
 
 show_status() {
   resolve_nvim
+  migrate_legacy_lockfile
   say "PSYCHOVIM // STATUS"
   say "nvim         $("$NVIM_BIN" --version | head -n 1)"
   if [[ -d "$CONFIG_DIR/.git" ]]; then
-    migrate_legacy_lockfile
     say "branch       $(git -C "$CONFIG_DIR" branch --show-current)"
     say "commit       $(git -C "$CONFIG_DIR" rev-parse --short HEAD)"
     if config_dirty; then say "config       dirty"; else say "config       clean"; fi
@@ -248,20 +326,23 @@ show_status() {
 show_help() {
   cat <<'EOF'
 pycho [file|dir]
-pycho update       update config, plugins, tools and parsers now
-pycho settings     open PychoSettings
-pycho status       show install and update state
-pycho doctor       open Morning Routine
-pycho parsers      sync Treesitter parsers
+pycho update           run pychoUpdate now
+pycho settings         open ⚙ Pycho Settings
+pycho marketplace      open 󰏗 Pycho Marketplace
+pycho status           show install and update state
+pycho doctor           open Morning Routine
+pycho parsers          sync Treesitter parsers
+pycho default-editor   make Pycho the default text editor
 pycho help
 
-Every normal launch checks updates first. Disable individual update lanes in
-PychoSettings, or use PSYCHOVIM_NO_AUTOUPDATE=1 for an emergency no-network boot.
+pychoUpdate and pychoUpdater are installer-provided aliases for `pycho update`.
+Every normal launch runs pychoUpdater first and shows the result inside Neovim.
+Use PSYCHOVIM_NO_AUTOUPDATE=1 for an emergency no-network boot.
 EOF
 }
 
 case "${1:-}" in
-  update)
+  update|pychoUpdate|pychoUpdater)
     shift
     update_psychovim "$@"
     ;;
@@ -270,6 +351,12 @@ case "${1:-}" in
     startup_update
     resolve_nvim
     exec "$NVIM_BIN" "$@" "+PychoSettings"
+    ;;
+  marketplace)
+    shift
+    startup_update
+    resolve_nvim
+    exec "$NVIM_BIN" "$@" "+PychoMarketplace"
     ;;
   status)
     shift
@@ -285,6 +372,10 @@ case "${1:-}" in
     shift
     resolve_nvim
     sync_parsers
+    ;;
+  default-editor)
+    shift
+    make_default_editor
     ;;
   help|-h|--help)
     show_help
