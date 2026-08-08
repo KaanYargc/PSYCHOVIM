@@ -56,7 +56,15 @@ jobs:
           ln -s "$GITHUB_WORKSPACE" "$HOME/.config/nvim"
 
       - name: Install plugins
-        run: nvim --headless "+Lazy! sync" +qa
+        run: |
+          for attempt in 1 2 3; do
+            if nvim --headless "+Lazy! sync" +qa; then
+              exit 0
+            fi
+            echo "lazy sync retry $attempt/3"
+            sleep $(( attempt * 2 ))
+          done
+          exit 1
 
       - name: Startup smoke test
         run: |
