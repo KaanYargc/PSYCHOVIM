@@ -40,17 +40,21 @@ pycho main.go
 nvim main.go
 ```
 
-Both go through `pychoUpdater` before Neovim starts.
+Both open Neovim immediately. `pychoUpdater` starts inside the editor after the UI is alive, so startup is not held hostage by GitHub, Mason or Treesitter.
+
+Updater progress appears as normal Neovim notifications:
 
 ```text
-pychoUpdater // CHECK
-config       current
-plugins      ok
-tools        ok
-parsers      ok
+pychoUpdater  Checking updates...
+pychoUpdater  Checking PSYCHOVIM config...
+pychoUpdater  Downloaded 3 config commit(s).
+pychoUpdater  Updating plugins...
+pychoUpdater  Updating LSP, formatter and linter tools...
+pychoUpdater  Updating Treesitter parsers...
+pychoUpdater  PSYCHOVIM is current.
 ```
 
-The result is also shown inside Neovim as a `pychoUpdater` notification.
+No `pychoUpdater // CHECK` wall is printed before the editor opens. Multiple PSYCHOVIM instances share an updater lock, so they do not all attack the same plugin checkout at once.
 
 Manual update commands:
 
@@ -222,7 +226,7 @@ Turn one off and native Neovim gets the key back.
 - parser update on launch
 - Lazy background checker
 
-Every normal `pycho` **and** `nvim` launch runs the explicit updater first. Lazy's checker remains a separate background inventory check while the interactive editor is open.
+Every normal `pycho` **and** `nvim` launch opens the editor first, then starts `pychoUpdater` asynchronously. On launches where `pychoUpdater` is active, Lazy's separate checker stays quiet so the two network jobs do not race. If automatic update lanes are disabled in Settings, Lazy's optional checker can still be used independently.
 
 ## 󰏗 Pycho Marketplace
 
