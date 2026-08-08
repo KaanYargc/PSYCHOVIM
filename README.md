@@ -2,7 +2,7 @@
 
 Pierce & Pierce dress code. Fewer stupid editor defaults.
 
-PychoVIM is an opinionated terminal editor built on the Neovim 0.12+ engine. The theme is *American Psycho*; the editor still has to work. No blood-drip ASCII art, no lore dump, no broken behavior excused as atmosphere.
+PychoVIM is an opinionated terminal editor powered by a Neovim 0.12+ engine. The theme is *American Psycho*; the editor still has to work. No blood-drip ASCII art, no lore dump, no broken behavior excused as atmosphere.
 
 ## Install
 
@@ -14,14 +14,14 @@ That command handles the machine, not just `~/.config/nvim`:
 
 - installs missing Git/archive tools, ripgrep, compiler/make, Node/npm and desktop integration on supported Linux package managers
 - uses Homebrew dependencies on macOS when available
-- installs the stable PychoVIM engine when Neovim 0.12+ is missing or too old
+- installs the stable PychoVIM engine when a compatible engine is missing or too old
 - installs the official tree-sitter CLI release
 - clones PychoVIM and backs up an existing config
 - installs extensions, Mason tools and parsers
 - makes PychoVIM the default text editor policy
 - opens PychoVIM when setup finishes in an interactive terminal
 
-The default-editor policy sets `EDITOR`, `VISUAL`, `GIT_EDITOR`, Git's editor, and Linux text-file MIME associations. If another program changes them later, PychoVIM quietly takes them back on launch/focus. It does not ask for permission every morning.
+The default-editor policy sets `EDITOR`, `VISUAL`, `GIT_EDITOR`, Git's editor, and Linux text-file MIME associations. If another program changes them later, PychoVIM quietly takes them back on launch/focus. There is no “restore default editor?” suggestion.
 
 ## One frontend
 
@@ -36,7 +36,7 @@ pycho main.go
 nvim main.go
 ```
 
-`nvim` is installed as a PychoVIM frontend wrapper. The real engine path is kept separately so there is no wrapper recursion.
+`nvim` is installed as a PychoVIM frontend wrapper. The underlying engine path is kept separately so there is no wrapper recursion.
 
 Normal launches are quiet. You do **not** get an updater report in the shell before the editor appears.
 
@@ -78,7 +78,7 @@ PSYCHOVIM_NO_AUTOUPDATE=1 pycho
 
 ## 󰏗 Extensions
 
-`Plugin Inventory` and `Marketplace` are one screen now:
+Plugin inventory, marketplace, themes and per-plugin settings live in one screen:
 
 ```bash
 pycho extensions
@@ -93,26 +93,48 @@ or:
 :PychoInventory
 ```
 
-`<leader>pp` opens it.
+`<leader>pp` opens it. Settings also links directly into the installed-extension/config view.
 
-The screen has three jobs:
+### Marketplace source: Dotfyle
 
-- **Installed** — PychoVIM core extensions plus Marketplace installs
-- **Search** — live GitHub repository search for `topic:neovim-plugin`
-- **Themes** — live GitHub search for `topic:neovim-colorscheme`
+The discovery catalog is Dotfyle. PychoVIM talks to Dotfyle's public plugin catalog API rather than doing a generic GitHub repository search.
 
-GitHub results are sorted by stars and include the repository description. Public search works without authentication. `GITHUB_TOKEN` or `GH_TOKEN` is used automatically when present for a friendlier API rate limit.
+Reference catalog:
+
+```text
+https://dotfyle.com/neovim/configurations/plugins
+```
+
+That page itself ranks plugin-heavy configurations; the installable entries in PychoVIM come from the same Dotfyle service's plugin index. Search, categories, trending/top/new ranking and colorschemes use Dotfyle data. GitHub is only used to clone the repository selected from a Dotfyle result.
+
+The Extensions panel exposes:
+
+- **Inventory** — PychoVIM core extensions plus Marketplace installs
+- **Discover** — Dotfyle plugin catalog
+- **Search** — Dotfyle keyword search
+- **Categories** — Dotfyle plugin categories
+- **Themes** — Dotfyle `colorscheme` category
+- **Trending / Top / New** — Dotfyle ranking modes
+- **Plugin config** — enable/disable, load policy and Lazy `opts`
+
+Results show Dotfyle configuration usage, GitHub stars when present, recent install movement and description/category metadata.
 
 Keys:
 
 | Key | Action |
 | --- | --- |
 | `i` | installed inventory |
-| `/` | search extensions |
-| `t` | search themes |
+| `d` | discover plugins |
+| `/` | search current catalog |
+| `t` | themes |
+| `f` | choose category |
+| `1` | trending |
+| `2` | top / popular |
+| `3` | new |
+| `[` / `]` | previous / next page |
 | `Enter` | install / configure |
 | `c` | extension settings |
-| `r` | refresh current search |
+| `r` | refresh |
 | `u` | run pychoUpdate |
 | `s` | open Settings |
 | `q` | close |
@@ -121,17 +143,17 @@ Marketplace state lives under editor state rather than the Git checkout, so `pyc
 
 ### Extension settings
 
-Marketplace extensions can be enabled/disabled, changed between startup and `VeryLazy`, removed, and given a JSON `opts` object that is passed to lazy.nvim. Known extensions such as Oil, ToggleTerm, Trouble and Neogit also get sane PychoVIM defaults.
+Marketplace extensions can be enabled/disabled, changed between startup and `VeryLazy`, removed, and given a JSON `opts` object that is passed to lazy.nvim. Known extensions such as Oil, ToggleTerm, Trouble and Neogit also get PychoVIM defaults.
 
-Arbitrary GitHub code does **not** get an invented Lua `config=function()` from PychoVIM. If a plugin needs custom executable Lua, that remains plugin-specific code rather than fake automatic configuration.
+PychoVIM does not invent arbitrary executable Lua for an unknown third-party plugin. If a plugin needs custom Lua beyond ordinary `opts`, that remains plugin-specific configuration rather than guessed code.
 
-Core extension switches still live in `⚙ PychoVIM Settings`.
+Core extension switches live in `⚙ PychoVIM Settings`; the Settings panel and Extensions inventory are two views over the same extension policy rather than separate plugin managers.
 
 ### Themes
 
-Themes are first-class Marketplace entries. Search with `t`, install one, then configure/activate it from Installed. Known themes have their `:colorscheme` name filled automatically; unknown themes ask for the command name once.
+Themes are first-class Marketplace entries sourced from Dotfyle's `colorscheme` category. Install one, then configure/activate it from the same Extensions screen. Known themes have their `:colorscheme` name filled automatically; unknown themes ask for the command name once.
 
-PychoVIM's Mask / After Hours highlight layer stays on top, so changing the base theme does not turn the editor into a random theme pack.
+PychoVIM's Mask / After Hours highlight layer stays on top, so changing the base theme does not erase the editor's visual identity.
 
 ## ⚙ Settings
 
@@ -188,7 +210,7 @@ Settings are persistent and survive updates.
 - autopairs
 - surround
 - which-key
-- installed extension settings → opens the Extensions inventory
+- installed extension settings → opens the Extensions/config inventory
 
 Python linting uses Ruff. JS/TS uses `eslint_d` only when an ESLint config actually exists above the current file.
 
@@ -214,21 +236,21 @@ Yes, `Ctrl+D` normally scrolls half a page. This is not a neutral config.
 
 ## Dashboard
 
-The dashboard uses one icon column and one navigation order:
+The dashboard has one fixed-width navigation column. File actions come first, editor management next, then the project-specific features:
 
 ```text
+  Find File
+  Recent Files
+  New File
 󰏗  Extensions
-   Settings
+  Settings
 󰚰  Update
-󰈞  New File
-󰈔  Find File
-󰋚  Recent Files
 󰌾  Dorsia
 󰌪  Business Card
-󰍃  PychoClose
+  PychoClose
 ```
 
-No separate Marketplace/Inventory entries competing for the same job.
+No separate Marketplace/Inventory entries compete for the same job.
 
 ## Dorsia
 
@@ -322,6 +344,6 @@ Inside:
 
 Maintenance logs live under `~/.cache/psychovim/`.
 
-Every push to `main` validates shell syntax, parses every Lua file, syncs the extension set and starts PychoVIM headlessly.
+Every push to `main` validates shell syntax, the Marketplace source contract, parses every Lua file, syncs the extension set and starts PychoVIM headlessly.
 
 MIT. Unofficial fan project. Not affiliated with Bret Easton Ellis, Lionsgate, or the film's rights holders.
